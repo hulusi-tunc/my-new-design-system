@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--app-font, system-ui, sans-serif);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #fff;
+  color: #111;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.dark body {
+  background: #0A0D12;
+  color: #E9EAEB;
+}
+
+::selection {
+  background: var(--brand-selection-bg, #E5DFFE);
+}
+
+.dark ::selection {
+  background: var(--brand-selection-bg-dark, #3D3072);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #414651;
+}
+
+pre {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #333;
+}
+
+.dark pre {
+  background: #181D27;
+  border-color: #252B37;
+  color: #D5D7DA;
+}
+
+code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+:not(pre) > code {
+  background: #f5f5f5;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.82em;
+  color: #555;
+}
+
+.dark :not(pre) > code {
+  background: #252B37;
+  color: #A4A7AE;
+}
+
+/* Override browser autofill styles for dark backgrounds */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px var(--autofill-bg, #fff) inset !important;
+  -webkit-text-fill-color: var(--autofill-text, #111) !important;
+  caret-color: var(--autofill-text, #111) !important;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  --autofill-bg: #0A0D12;
+  --autofill-text: #FAFAFA;
+}

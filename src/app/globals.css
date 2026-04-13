@@ -3,8 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--app-font, system-ui, sans-serif);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-space-grotesk, "Space Grotesk", system-ui, sans-serif);
+  --font-mono: var(--font-space-mono, "Space Mono", monospace);
 }
 
 * {
@@ -12,24 +12,28 @@
 }
 
 body {
-  background: #fff;
-  color: #111;
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  background: #f5f5f5;
+  color: #1a1a1a;
+  font-family: var(--font-sans), "Space Grotesk", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  transition: background 200ms ease, color 200ms ease;
+  transition:
+    background 200ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    color 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .dark body {
-  background: #0A0D12;
-  color: #E9EAEB;
+  background: #000000;
+  color: #e8e8e8;
 }
 
 ::selection {
-  background: var(--brand-selection-bg, #E5DFFE);
+  background: rgba(215, 25, 33, 0.12);
+  color: inherit;
 }
 
 .dark ::selection {
-  background: var(--brand-selection-bg-dark, #3D3072);
+  background: rgba(215, 25, 33, 0.2);
+  color: inherit;
 }
 
 ::-webkit-scrollbar {
@@ -39,61 +43,61 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #ddd;
-  border-radius: 4px;
+  background: #cccccc;
+  border-radius: 0;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #414651;
+  background: #333333;
 }
 
 pre {
-  background: #fafafa;
-  border: 1px solid #eee;
-  border-radius: 6px;
-  padding: 14px 16px;
+  background: #f0f0f0;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 16px;
   overflow-x: auto;
   font-size: 13px;
-  line-height: 1.65;
-  color: #333;
+  line-height: 1.5;
+  color: #1a1a1a;
+  font-family: var(--font-mono), "Space Mono", monospace;
 }
 
 .dark pre {
-  background: #181D27;
-  border-color: #252B37;
-  color: #D5D7DA;
+  background: #1a1a1a;
+  border-color: #222222;
+  color: #e8e8e8;
 }
 
 code {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-mono), "Space Mono", monospace;
 }
 
 :not(pre) > code {
-  background: #f5f5f5;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 0.82em;
-  color: #555;
+  background: #f0f0f0;
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-size: 0.85em;
+  color: #666666;
 }
 
 .dark :not(pre) > code {
-  background: #252B37;
-  color: #A4A7AE;
+  background: #1a1a1a;
+  color: #999999;
 }
 
-/* Override browser autofill styles for dark backgrounds */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px var(--autofill-bg, #fff) inset !important;
-  -webkit-text-fill-color: var(--autofill-text, #111) !important;
-  caret-color: var(--autofill-text, #111) !important;
+  -webkit-box-shadow: 0 0 0 30px var(--autofill-bg, #ffffff) inset !important;
+  -webkit-text-fill-color: var(--autofill-text, #1a1a1a) !important;
+  caret-color: var(--autofill-text, #1a1a1a) !important;
 }
 
 .dark input:-webkit-autofill,
 .dark input:-webkit-autofill:hover,
 .dark input:-webkit-autofill:focus,
 .dark input:-webkit-autofill:active {
-  --autofill-bg: #0A0D12;
-  --autofill-text: #FAFAFA;
+  --autofill-bg: #000000;
+  --autofill-text: #e8e8e8;
 }

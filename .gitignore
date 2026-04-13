@@ -33,9 +33,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# registry screenshots (generated at build time)
+/public/registry/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# nested skill package (has its own .git)
+/nothing-design-skill/

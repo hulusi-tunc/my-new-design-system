@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { RoleProvider } from "@/components/providers/role-provider";
-import { DSHeader } from "@/components/ds-header";
-import { DSSidebar } from "@/components/ds-sidebar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
   subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Octopus Design System",
-  description: "Design tokens and components.",
+  title: "Hubera VD — Vibe Design Registry",
+  description:
+    "Browse, fork, and publish design systems. Install any system (or a single component) straight into your project via Claude Code.",
 };
 
 export default function RootLayout({
@@ -35,15 +36,16 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} style={{ "--app-font": "var(--font-geist-sans)" } as React.CSSProperties}>
+      <body
+        className={`${spaceGrotesk.variable} ${spaceMono.variable} antialiased`}
+        style={
+          {
+            "--app-font": "var(--font-space-grotesk)",
+          } as React.CSSProperties
+        }
+      >
         <ThemeProvider>
-          <RoleProvider>
-            <DSHeader />
-            <div className="flex pt-12">
-              <DSSidebar />
-              <main className="flex-1 ml-52">{children}</main>
-            </div>
-          </RoleProvider>
+          <RoleProvider>{children}</RoleProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,0 +1,164 @@
+{
+  "name": "CESP DS",
+  "slug": "cesp",
+  "version": "0.1.0",
+  "description": "A CSS-variable-based component library with 14 React components, 51 design tokens, and a custom icon system. Built with tsup for tree-shakeable npm distribution.",
+  "author": {
+    "name": "hulusi-tunc",
+    "github": "hulusi-tunc",
+    "avatar": "https://github.com/hulusi-tunc.png"
+  },
+  "license": "MIT",
+  "createdAt": "2025-03-01",
+  "updatedAt": "2026-04-13",
+  "parent": null,
+  "repository": "https://github.com/hulusi-tunc/CESP-v2",
+  "defaultBranch": "main",
+  "installPath": "design-systems/cesp",
+  "sourceLayout": {
+    "components": "src/components/ui"
+  },
+  "technology": ["react-18-19", "typescript", "tailwind-v4", "tsup"],
+  "architecture": "css-variables",
+  "tokens": {
+    "colors": {
+      "neutral": {
+        "0": "#FFFFFF",
+        "100": "#F6F8FA",
+        "200": "#E2E4E9",
+        "300": "#CDD0D5",
+        "400": "#868C98",
+        "500": "#525866",
+        "600": "#31353F",
+        "700": "#20232D",
+        "800": "#161922",
+        "900": "#0A0D14"
+      },
+      "blue": {
+        "lighter": "#EBF1FF",
+        "light": "#C2D6FF",
+        "base": "#375DFB",
+        "dark": "#253EA7",
+        "darker": "#162664"
+      },
+      "orange": {
+        "lighter": "#FEF3EB",
+        "light": "#FFDAC2",
+        "base": "#F17B2C",
+        "dark": "#C2540A",
+        "darker": "#6E330C"
+      },
+      "yellow": {
+        "lighter": "#FEF7EC",
+        "light": "#FBDFB1",
+        "base": "#F2AE40",
+        "dark": "#B47818",
+        "darker": "#693D11"
+      },
+      "red": {
+        "lighter": "#FDEDF0",
+        "light": "#F8C9D2",
+        "base": "#DF1C41",
+        "dark": "#AF1D38",
+        "darker": "#710E21"
+      },
+      "green": {
+        "lighter": "#EFFAF6",
+        "light": "#CBF5E5",
+        "base": "#38C793",
+        "dark": "#2D9F75",
+        "darker": "#176448"
+      },
+      "purple": {
+        "lighter": "#EEEBFF",
+        "light": "#CAC2FF",
+        "base": "#6E3FF3",
+        "dark": "#5A36BF",
+        "darker": "#2B1664"
+      },
+      "pink": {
+        "lighter": "#FDEBFF",
+        "light": "#F9C2FF",
+        "base": "#E255F2",
+        "dark": "#9C23A9",
+        "darker": "#620F6C"
+      },
+      "teal": {
+        "lighter": "#EBFAFF",
+        "light": "#C2EFFF",
+        "base": "#35B9E9",
+        "dark": "#1F87AD",
+        "darker": "#164564"
+      },
+      "semantic": {
+        "primary-lighter": "var(--blue-lighter)",
+        "primary-light": "var(--blue-light)",
+        "primary-base": "var(--blue-base)",
+        "primary-dark": "var(--blue-dark)",
+        "primary-darker": "var(--blue-darker)",
+        "bg-strong-900": "var(--neutral-900)",
+        "bg-surface-700": "var(--neutral-700)",
+        "bg-soft-200": "var(--neutral-200)",
+        "bg-weak-100": "var(--neutral-100)",
+        "bg-white-0": "var(--neutral-0)",
+        "text-main-900": "var(--neutral-900)",
+        "text-sub-500": "var(--neutral-500)",
+        "text-soft-400": "var(--neutral-400)",
+        "text-disabled-300": "var(--neutral-300)",
+        "text-white-0": "var(--neutral-0)",
+        "stroke-strong-900": "var(--neutral-900)",
+        "stroke-sub-300": "var(--neutral-300)",
+        "stroke-soft-200": "var(--neutral-200)",
+        "stroke-disabled-100": "var(--neutral-100)",
+        "stroke-white-0": "var(--neutral-0)",
+        "icon-strong-900": "var(--neutral-900)",
+        "icon-sub-500": "var(--neutral-500)",
+        "icon-soft-400": "var(--neutral-400)",
+        "icon-disabled-300": "var(--neutral-300)",
+        "icon-white-0": "var(--neutral-0)",
+        "state-success": "var(--green-base)",
+        "state-warning": "var(--orange-base)",
+        "state-error": "var(--red-base)",
+        "state-information": "var(--blue-base)",
+        "state-away": "var(--yellow-base)",
+        "state-feature": "var(--purple-base)",
+        "state-neutral": "var(--neutral-400)",
+        "state-verified": "var(--teal-base)"
+      }
+    },
+    "typography": {
+      "fontFamily": "System UI",
+      "weights": ["400", "500", "600"],
+      "scaleSteps": 6
+    },
+    "spacing": {
+      "unit": "px",
+      "steps": 11
+    },
+    "radius": {
+      "steps": 6,
+      "full": 9999
+    }
+  },
+  "components": [
+    { "name": "Button", "variants": 3, "sizes": 3, "file": "Button.tsx" },
+    { "name": "Compact Button", "variants": 2, "sizes": 2, "file": "CompactButton.tsx" },
+    { "name": "Fancy Button", "variants": 1, "sizes": 3, "file": "FancyButton.tsx" },
+    { "name": "Link Button", "variants": 5, "sizes": 2, "file": "LinkButton.tsx" },
+    { "name": "Social Button", "variants": 2, "sizes": 1, "file": "SocialButton.tsx" },
+    { "name": "Input", "variants": 1, "sizes": 3, "file": "Input.tsx" },
+    { "name": "Checkbox", "variants": 1, "sizes": 1, "file": "Checkbox.tsx" },
+    { "name": "Badge", "variants": 3, "sizes": 2, "file": "Badge.tsx" },
+    { "name": "Status Badge", "variants": 2, "sizes": 1, "file": "StatusBadge.tsx" },
+    { "name": "Card", "variants": 1, "sizes": 1, "file": "Card.tsx" },
+    { "name": "Metric Card", "variants": 1, "sizes": 1, "file": "MetricCard.tsx" },
+    { "name": "Table", "variants": 1, "sizes": 1, "file": "Table.tsx" },
+    { "name": "Step Indicator", "variants": 1, "sizes": 1, "file": "StepIndicator.tsx" },
+    { "name": "Dropdown Menu", "variants": 1, "sizes": 1, "file": "DropdownMenu.tsx" }
+  ],
+  "screenshots": {
+    "preview": "screenshots/preview.png",
+    "gallery": []
+  },
+  "tags": ["css-variables", "tree-shakeable", "npm-package", "tsup", "remixicon", "2500-icons"]
+}

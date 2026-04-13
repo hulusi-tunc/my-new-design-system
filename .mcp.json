@@ -9,7 +9,7 @@
       "args": ["--allowFileAccessFromFiles"]
     },
     "ds-registry": {
-      "url": "http://localhost:3001/api/mcp"
+      "url": "https://hubera.vercel.app/api/mcp"
     },
     "supabase": {
       "command": "npx",

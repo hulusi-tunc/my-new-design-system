@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
+import { createClient } from "@/lib/supabase/client";
 
 import GithubFillIcon from "remixicon-react/GithubFillIcon";
 import ArrowRightLineIcon from "remixicon-react/ArrowRightLineIcon";
@@ -11,6 +14,27 @@ import ArrowLeftLineIcon from "remixicon-react/ArrowLeftLineIcon";
 export function LoginClient() {
   const { theme } = useTheme();
   const t = getNd(theme);
+  const searchParams = useSearchParams();
+  const errorFromQuery = searchParams.get("error");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(errorFromQuery);
+
+  async function handleGitHubSignIn() {
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
+    });
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
+    }
+    // On success, Supabase redirects the browser — no further action needed.
+  }
 
   return (
     <div
@@ -82,10 +106,8 @@ export function LoginClient() {
 
         {/* GitHub button — minimal, editorial, no rounded pill shape */}
         <button
-          onClick={() => {
-            // TODO: wire up NextAuth signIn("github")
-            window.location.href = "/catalog";
-          }}
+          onClick={handleGitHubSignIn}
+          disabled={loading}
           style={{
             width: "100%",
             display: "flex",
@@ -101,23 +123,40 @@ export function LoginClient() {
             borderTop: `1px solid ${t.borderVisible}`,
             borderBottom: `1px solid ${t.borderVisible}`,
             background: "transparent",
-            color: t.textDisplay,
-            cursor: "pointer",
+            color: loading ? t.textDisabled : t.textDisplay,
+            cursor: loading ? "wait" : "pointer",
+            opacity: loading ? 0.6 : 1,
             transition: "color 200ms cubic-bezier(0.25,0.1,0.25,1)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = t.accent;
+            if (!loading) e.currentTarget.style.color = t.accent;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = t.textDisplay;
+            if (!loading) e.currentTarget.style.color = t.textDisplay;
           }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <GithubFillIcon size={16} />
-            Continue with GitHub
+            {loading ? "Redirecting to GitHub..." : "Continue with GitHub"}
           </span>
           <ArrowRightLineIcon size={16} />
         </button>
+
+        {error && (
+          <p
+            style={{
+              fontFamily: editorialFonts.mono,
+              fontSize: 11,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: t.accent,
+              marginTop: 16,
+              lineHeight: 1.6,
+            }}
+          >
+            ! {error}
+          </p>
+        )}
 
         {/* Fine print */}
         <p

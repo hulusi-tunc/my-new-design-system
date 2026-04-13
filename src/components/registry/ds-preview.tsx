@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useTheme } from "@/components/providers/theme-provider";
-import { getNd } from "@/lib/nothing-tokens";
+import { getNd, editorialFonts } from "@/lib/nothing-tokens";
+import { ComponentPreview } from "@/components/registry/component-preview";
 import type { DSManifest, DSTokenColors } from "@/lib/types";
 
 /* ── Helpers ────────────────────────────────────────── */
@@ -43,10 +44,10 @@ function extractSwatches(colors: DSTokenColors): string[] {
         seen.add(shade);
       }
     }
-    if (result.length >= 6) break;
+    if (result.length >= 5) break;
   }
 
-  if (result.length < 6) {
+  if (result.length < 5) {
     for (const [key, value] of Object.entries(colors)) {
       if (priorityKeys.includes(key)) continue;
       if (value && typeof value === "object") {
@@ -57,11 +58,43 @@ function extractSwatches(colors: DSTokenColors): string[] {
           seen.add(shade);
         }
       }
-      if (result.length >= 6) break;
+      if (result.length >= 5) break;
     }
   }
 
-  return result.slice(0, 6);
+  return result.slice(0, 5);
+}
+
+/**
+ * Pick the most visually representative component for a catalog thumbnail.
+ * Prefers rich, differentiated components over plain buttons.
+ */
+function pickFeaturedComponent(manifest: DSManifest): string | null {
+  if (!manifest.components.length) return null;
+
+  const names = manifest.components.map((c) => c.name);
+  const priorities = [
+    /metric\s*card/i,
+    /status\s*badge/i,
+    /fancy\s*button/i,
+    /step\s*indicator/i,
+    /verification\s*code/i,
+    /design\s*tip/i,
+    /badge\s*group/i,
+    /dropdown\s*menu/i,
+    /table/i,
+    /card/i,
+    /badge/i,
+    /input/i,
+    /button/i,
+  ];
+
+  for (const pattern of priorities) {
+    const found = names.find((n) => pattern.test(n));
+    if (found) return found;
+  }
+
+  return names[0];
 }
 
 /* ── DSPreview ──────────────────────────────────────── */
@@ -78,163 +111,146 @@ export function DSPreview({ manifest }: { manifest: DSManifest }) {
     () => extractSwatches(manifest.tokens.colors),
     [manifest.tokens.colors]
   );
+  const featured = useMemo(
+    () => pickFeaturedComponent(manifest),
+    [manifest]
+  );
 
   const dsFont =
     manifest.tokens.typography.fontFamily || "system-ui, sans-serif";
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        gap: 20,
-        padding: "28px 24px",
-        background: t.surfaceRaised,
-        width: "100%",
-        minHeight: 200,
-        overflow: "hidden",
-      }}
-    >
-      {/* Top row: buttons + typography */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 20,
-          overflow: "hidden",
-        }}
-      >
-        {/* Button samples */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              fontFamily:
-                "'Space Mono', var(--font-space-mono), monospace",
-              fontSize: 10,
-              letterSpacing: "0.08em",
-              color: t.textDisabled,
-            }}
-          >
-            BUTTONS
-          </span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <span
-              style={{
-                padding: "5px 14px",
-                fontSize: 11,
-                fontWeight: 500,
-                fontFamily: dsFont,
-                color: "#fff",
-                background: brandColor,
-                border: "none",
-                borderRadius: 6,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Button
-            </span>
-            <span
-              style={{
-                padding: "5px 14px",
-                fontSize: 11,
-                fontWeight: 500,
-                fontFamily: dsFont,
-                color: brandColor,
-                background: "transparent",
-                border: `1.5px solid ${brandColor}`,
-                borderRadius: 6,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Button
-            </span>
-          </div>
-        </div>
+  /* ── Style fragments ───────────────────────────── */
 
-        {/* Typography sample */}
-        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+  const containerStyle: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    background: theme === "dark" ? t.surfaceInk : "rgb(250, 250, 252)",
+    width: "100%",
+    minHeight: 220,
+    overflow: "hidden",
+    position: "relative",
+  };
+
+  // Subtle dot-grid pattern for the preview bg
+  const dotPatternStyle: CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    backgroundImage: `radial-gradient(${t.border} 1px, transparent 1px)`,
+    backgroundSize: "18px 18px",
+    opacity: 0.6,
+    pointerEvents: "none",
+  };
+
+  // Featured component area
+  const previewStageStyle: CSSProperties = {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "28px 24px 16px",
+    position: "relative",
+    zIndex: 1,
+    minHeight: 140,
+  };
+
+  // Meta footer strip
+  const metaStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 20px",
+    borderTop: `1px solid ${t.border}`,
+    background: t.surface,
+    position: "relative",
+    zIndex: 1,
+    flexWrap: "wrap",
+  };
+
+  const labelStyle: CSSProperties = {
+    fontFamily: editorialFonts.mono,
+    fontSize: 10,
+    letterSpacing: "0.06em",
+    color: t.textDisabled,
+    textTransform: "uppercase",
+  };
+
+  const valueStyle: CSSProperties = {
+    fontFamily: editorialFonts.mono,
+    fontSize: 10,
+    letterSpacing: "0.06em",
+    color: t.textSecondary,
+    textTransform: "uppercase",
+    fontWeight: 600,
+  };
+
+  // Font name shown in the DS's own font to "teach" what the font looks like
+  const fontSampleStyle: CSSProperties = {
+    fontFamily: dsFont,
+    fontSize: 14,
+    fontWeight: 600,
+    color: t.textPrimary,
+    letterSpacing: "-0.01em",
+  };
+
+  const swatchDotStyle = (color: string): CSSProperties => ({
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    background: color,
+    border: `1px solid ${t.border}`,
+    flexShrink: 0,
+  });
+
+  return (
+    <div style={containerStyle}>
+      <div style={dotPatternStyle} />
+
+      {/* Featured component stage */}
+      <div style={previewStageStyle}>
+        {featured ? (
+          <ComponentPreview name={featured} tokens={manifest.tokens} />
+        ) : (
           <span
             style={{
-              fontFamily:
-                "'Space Mono', var(--font-space-mono), monospace",
-              fontSize: 10,
-              letterSpacing: "0.08em",
-              color: t.textDisabled,
-              display: "block",
-              marginBottom: 4,
-            }}
-          >
-            TYPOGRAPHY
-          </span>
-          <p
-            style={{
-              fontSize: 28,
-              fontWeight: 700,
               fontFamily: dsFont,
-              color: t.textDisplay,
-              lineHeight: 1.1,
-              margin: 0,
+              fontSize: 32,
+              fontWeight: 700,
+              color: t.textPrimary,
               letterSpacing: "-0.02em",
             }}
           >
-            Aa
-          </p>
-          <p
-            style={{
-              fontSize: 11,
-              fontFamily: dsFont,
-              color: t.textSecondary,
-              lineHeight: 1.4,
-              margin: "4px 0 0",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            The quick brown fox jumps over the lazy dog.
-          </p>
-        </div>
+            {manifest.name.charAt(0)}a
+          </span>
+        )}
       </div>
 
-      {/* Color swatches */}
-      {swatches.length > 0 && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {swatches.map((color, i) => (
-            <div
-              key={i}
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: "50%",
-                background: color,
-                border: `1px solid ${t.border}`,
-                flexShrink: 0,
-              }}
-              title={color}
-            />
-          ))}
-          <span
-            style={{
-              fontFamily:
-                "'Space Mono', var(--font-space-mono), monospace",
-              fontSize: 10,
-              letterSpacing: "0.04em",
-              color: t.textDisabled,
-              marginLeft: 4,
-            }}
-          >
-            {swatches.length} SCALES
+      {/* Meta footer: font + swatches */}
+      <div style={metaStyle}>
+        {/* Font name in the DS's own font */}
+        <span style={fontSampleStyle}>
+          {manifest.tokens.typography.fontFamily || "System"}
+        </span>
+
+        <span style={{ flex: 1 }} />
+
+        {/* Color swatches */}
+        {swatches.length > 0 && (
+          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+            {swatches.map((color, i) => (
+              <div key={i} style={swatchDotStyle(color)} title={color} />
+            ))}
+          </div>
+        )}
+
+        <span style={labelStyle}>·</span>
+        <span style={valueStyle}>
+          {manifest.components.length}
+          <span style={{ color: t.textDisabled, fontWeight: 400 }}>
+            {" "}
+            COMPS
           </span>
-        </div>
-      )}
+        </span>
+      </div>
     </div>
   );
 }

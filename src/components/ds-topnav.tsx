@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { HuberaLogo } from "@/components/brand/hubera-logo";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 // Remix icons — established project icon library
 import SearchLineIcon from "remixicon-react/SearchLineIcon";
@@ -112,6 +114,39 @@ export function DSTopNav() {
   const pathname = usePathname();
   const [searchFocused, setSearchFocused] = useState(false);
   const [avatarHovered, setAvatarHovered] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let mounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) {
+        setUser(data.user);
+        setAuthReady(true);
+      }
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (mounted) setUser(session?.user ?? null);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const githubUsername =
+    (user?.user_metadata?.user_name as string | undefined) ??
+    (user?.user_metadata?.preferred_username as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    "";
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarInitial = githubUsername.charAt(0).toUpperCase() || "?";
 
   const isActive = (href: string) => {
     if (href === "/catalog") {
@@ -129,7 +164,6 @@ export function DSTopNav() {
     right: 0,
     height: TOPNAV_HEIGHT,
     background: t.black,
-    borderBottom: `1px solid ${t.border}`,
     display: "flex",
     alignItems: "center",
     gap: 28,
@@ -312,16 +346,53 @@ export function DSTopNav() {
           {theme === "dark" ? <SunLineIcon size={18} /> : <MoonLineIcon size={18} />}
         </IconButton>
 
-        <div
-          style={avatarStyle}
-          onMouseEnter={() => setAvatarHovered(true)}
-          onMouseLeave={() => setAvatarHovered(false)}
-          role="button"
-          tabIndex={0}
-          aria-label="Your account"
-        >
-          H
-        </div>
+        {authReady && !user && (
+          <Link
+            href="/login"
+            style={{
+              fontFamily: editorialFonts.body,
+              fontSize: 13,
+              fontWeight: 500,
+              color: t.textSecondary,
+              textDecoration: "none",
+              padding: "8px 14px",
+              marginLeft: 8,
+              borderRadius: swatchRadii.full,
+              border: `1px solid ${t.border}`,
+              transition: "color 120ms ease-out, border-color 120ms ease-out",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = t.textDisplay;
+              e.currentTarget.style.borderColor = t.borderStrong;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = t.textSecondary;
+              e.currentTarget.style.borderColor = t.border;
+            }}
+          >
+            Sign in
+          </Link>
+        )}
+
+        {user && (
+          <Link
+            href="/dashboard"
+            style={{
+              ...avatarStyle,
+              textDecoration: "none",
+              overflow: "hidden",
+              backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+            onMouseEnter={() => setAvatarHovered(true)}
+            onMouseLeave={() => setAvatarHovered(false)}
+            aria-label={`Account: ${githubUsername}`}
+            title={githubUsername}
+          >
+            {!avatarUrl && avatarInitial}
+          </Link>
+        )}
       </div>
     </nav>
   );

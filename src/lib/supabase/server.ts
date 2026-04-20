@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createBrowserStyleClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "./types";
 
@@ -30,22 +31,14 @@ export async function createClient() {
 
 /**
  * Admin client with service role key — bypasses RLS.
- * Use ONLY in server-side contexts (API routes, server actions) where
- * you need elevated permissions. Never expose to the browser.
+ * Uses plain @supabase/supabase-js rather than @supabase/ssr because the
+ * ssr client's types collapse inserts to `never` under Supabase JS 2.x.
+ * Never expose to the browser.
  */
 export function createAdminClient() {
-  return createServerClient<Database>(
+  return createBrowserStyleClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return [];
-        },
-        setAll() {
-          // no-op for admin client
-        },
-      },
-    }
+    { auth: { persistSession: false } }
   );
 }

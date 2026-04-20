@@ -12,16 +12,20 @@
   "createdAt": "2025-04-01",
   "updatedAt": "2026-04-13",
   "parent": null,
+  "platform": "web-react",
   "repository": "https://github.com/hulusi-tunc/my-new-design-system",
   "defaultBranch": "main",
   "installPath": "design-systems/octopus",
   "sourceLayout": {
-    "components": "src/components/ui",
-    "tokens": "src/styles/design-tokens.ts",
-    "colorUtils": "src/styles/color-utils.ts",
-    "themeProvider": "src/components/providers/theme-provider.tsx",
-    "roleProvider": "src/components/providers/role-provider.tsx",
-    "globalsCss": "src/app/globals.css"
+    "platform": "web-react",
+    "componentsDir": "src/components/ui",
+    "files": [
+      { "path": "src/styles/design-tokens.ts", "role": "tokens" },
+      { "path": "src/styles/color-utils.ts", "role": "colorUtils" },
+      { "path": "src/components/providers/theme-provider.tsx", "role": "themeProvider" },
+      { "path": "src/components/providers/role-provider.tsx", "role": "roleProvider" },
+      { "path": "src/app/globals.css", "role": "globalsCss" }
+    ]
   },
   "technology": ["react-19", "typescript", "tailwind-v4", "next-16"],
   "architecture": "inline-styles",
@@ -439,8 +443,8 @@
       }
     },
     "typography": {
-      "fontFamily": "Geist Sans",
-      "weights": ["400", "500", "600", "700"],
+      "fontFamily": "Space Grotesk",
+      "weights": ["300", "400", "500", "600", "700"],
       "scaleSteps": 11
     },
     "spacing": {
@@ -453,21 +457,316 @@
     }
   },
   "components": [
-    { "name": "Button", "variants": 5, "sizes": 4, "file": "button.tsx" },
-    { "name": "Badge", "variants": 3, "sizes": 3, "file": "badge.tsx" },
-    { "name": "Badge Group", "variants": 1, "sizes": 1, "file": "badge-group.tsx" },
-    { "name": "Input", "variants": 1, "sizes": 2, "file": "input.tsx" },
-    { "name": "Textarea", "variants": 1, "sizes": 2, "file": "textarea.tsx" },
-    { "name": "Tag", "variants": 1, "sizes": 3, "file": "tag.tsx" },
-    { "name": "Tabs", "variants": 2, "sizes": 2, "file": "tabs.tsx" },
-    { "name": "Close Button", "variants": 1, "sizes": 1, "file": "close-button.tsx" },
-    { "name": "Utility Button", "variants": 1, "sizes": 1, "file": "utility-button.tsx" },
-    { "name": "Social Button", "variants": 1, "sizes": 1, "file": "social-button.tsx" },
-    { "name": "Icon", "variants": 1, "sizes": 1, "file": "icon.tsx" },
-    { "name": "Verification Code Input", "variants": 1, "sizes": 2, "file": "verification-code-input.tsx" },
-    { "name": "App Navigation", "variants": 1, "sizes": 1, "file": "app-navigation.tsx" },
-    { "name": "Code Block", "variants": 1, "sizes": 1, "file": "code-block.tsx" },
-    { "name": "Design Tip", "variants": 1, "sizes": 1, "file": "design-tip.tsx" }
+    {
+      "name": "Button",
+      "variants": 5,
+      "sizes": 4,
+      "file": "button.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Primary", "code": "<Button>Save changes</Button>" },
+        { "name": "Secondary", "code": "<Button variant=\"secondary\">Cancel</Button>" },
+        { "name": "Tertiary", "code": "<Button variant=\"tertiary\">Learn more</Button>" },
+        { "name": "Link", "code": "<Button variant=\"link-color\">Read documentation</Button>" },
+        { "name": "Destructive", "code": "<Button destructive>Delete account</Button>" },
+        { "name": "Loading", "code": "<Button loading>Saving…</Button>" },
+        { "name": "Disabled", "code": "<Button disabled>Can't click</Button>" },
+        { "name": "Small", "code": "<Button size=\"sm\">Sm button</Button>" },
+        { "name": "Extra Large", "code": "<Button size=\"xl\">XL button</Button>" }
+      ],
+      "props": {
+        "variant": {
+          "type": "enum",
+          "values": ["primary", "secondary", "tertiary", "link-color", "link-gray"],
+          "default": "primary"
+        },
+        "size": {
+          "type": "enum",
+          "values": ["sm", "md", "lg", "xl"],
+          "default": "md"
+        },
+        "destructive": { "type": "boolean", "default": false },
+        "loading": { "type": "boolean", "default": false },
+        "disabled": { "type": "boolean", "default": false },
+        "children": { "type": "string", "default": "Click me" }
+      }
+    },
+    {
+      "name": "Badge",
+      "variants": 3,
+      "sizes": 3,
+      "file": "badge.tsx",
+      "displaySize": "sm",
+      "examples": [
+        { "name": "Default", "code": "<Badge>New</Badge>" },
+        { "name": "Brand pill", "code": "<Badge color=\"brand\" type=\"pill-color\">Premium</Badge>" },
+        { "name": "Success modern", "code": "<Badge color=\"success\" type=\"badge-modern\">Active</Badge>" },
+        { "name": "Error", "code": "<Badge color=\"error\">Failed</Badge>" },
+        { "name": "Warning", "code": "<Badge color=\"warning\">Pending</Badge>" },
+        { "name": "With dot", "code": "<Badge color=\"success\" icon=\"dot\">Online</Badge>" },
+        { "name": "Small", "code": "<Badge size=\"sm\">SM</Badge>" },
+        { "name": "Large", "code": "<Badge size=\"lg\">Large</Badge>" }
+      ],
+      "props": {
+        "color": {
+          "type": "enum",
+          "values": ["gray", "brand", "error", "warning", "success", "gray-blue", "blue-light", "blue", "indigo", "purple", "pink", "orange"],
+          "default": "gray"
+        },
+        "type": {
+          "type": "enum",
+          "values": ["pill-color", "badge-color", "badge-modern"],
+          "default": "badge-color"
+        },
+        "size": { "type": "enum", "values": ["sm", "md", "lg"], "default": "md" },
+        "icon": {
+          "type": "enum",
+          "values": ["none", "dot", "icon-leading", "icon-trailing", "x-close", "avatar", "icon-only"],
+          "default": "none"
+        },
+        "children": { "type": "string", "default": "Badge" }
+      }
+    },
+    {
+      "name": "Badge Group",
+      "variants": 1,
+      "sizes": 1,
+      "file": "badge-group.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Leading label", "code": "<BadgeGroup badgeLabel=\"New\" color=\"brand\">Just shipped</BadgeGroup>" },
+        { "name": "Trailing", "code": "<BadgeGroup badgeLabel=\"v2.0\" badgePosition=\"trailing\" color=\"success\">Upgrade</BadgeGroup>" },
+        { "name": "Large", "code": "<BadgeGroup badgeLabel=\"Beta\" size=\"lg\" color=\"warning\">Try it out</BadgeGroup>" }
+      ],
+      "props": {
+        "color": {
+          "type": "enum",
+          "values": ["gray", "brand", "error", "warning", "success", "gray-blue", "blue-light", "blue", "indigo", "purple", "pink", "orange"],
+          "default": "gray"
+        },
+        "type": { "type": "enum", "values": ["pill-color", "badge-modern"], "default": "pill-color" },
+        "size": { "type": "enum", "values": ["md", "lg"], "default": "md" },
+        "badgePosition": { "type": "enum", "values": ["leading", "trailing"], "default": "leading" },
+        "badgeLabel": { "type": "string", "default": "New" },
+        "children": { "type": "string", "default": "Latest update" }
+      }
+    },
+    {
+      "name": "Input",
+      "variants": 1,
+      "sizes": 2,
+      "file": "input.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Email", "code": "<Input label=\"Email\" placeholder=\"you@hubera.dev\" />" },
+        { "name": "With hint", "code": "<Input label=\"Team name\" hint=\"Visible to all members\" placeholder=\"Acme\" />" },
+        { "name": "With error", "code": "<Input label=\"Username\" error=\"Already taken\" />" },
+        { "name": "With leading text", "code": "<Input label=\"Website\" leadingText=\"https://\" trailingText=\".com\" placeholder=\"hubera\" />" },
+        { "name": "Small size", "code": "<Input inputSize=\"sm\" placeholder=\"Search…\" />" }
+      ],
+      "props": {
+        "inputSize": { "type": "enum", "values": ["sm", "md"], "default": "md" },
+        "label": { "type": "string", "default": "Label" },
+        "placeholder": { "type": "string", "default": "Type here…" },
+        "hint": { "type": "string", "default": "" },
+        "error": { "type": "string", "default": "" },
+        "leadingText": { "type": "string", "default": "" },
+        "trailingText": { "type": "string", "default": "" },
+        "disabled": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "name": "Textarea",
+      "variants": 1,
+      "sizes": 2,
+      "file": "textarea.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Default", "code": "<Textarea label=\"Message\" placeholder=\"Your thoughts…\" />" },
+        { "name": "With hint", "code": "<Textarea label=\"Bio\" hint=\"A sentence or two about you\" />" },
+        { "name": "With error", "code": "<Textarea label=\"Notes\" error=\"Must be under 280 chars\" />" }
+      ],
+      "props": {
+        "textareaSize": { "type": "enum", "values": ["sm", "md"], "default": "md" },
+        "label": { "type": "string", "default": "Message" },
+        "placeholder": { "type": "string", "default": "Your thoughts…" },
+        "hint": { "type": "string", "default": "" },
+        "error": { "type": "string", "default": "" },
+        "disabled": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "name": "Tag",
+      "variants": 1,
+      "sizes": 3,
+      "file": "tag.tsx",
+      "displaySize": "sm",
+      "examples": [
+        { "name": "Default", "code": "<Tag>design</Tag>" },
+        { "name": "With dot", "code": "<Tag dot dotColor=\"#17B26A\">Active</Tag>" },
+        { "name": "Checkbox", "code": "<Tag checkbox checked>Selected</Tag>" },
+        { "name": "With count", "code": "<Tag count={42}>Issues</Tag>" },
+        { "name": "Large", "code": "<Tag size=\"lg\">tokens</Tag>" },
+        { "name": "Disabled", "code": "<Tag disabled>read-only</Tag>" }
+      ],
+      "props": {
+        "size": { "type": "enum", "values": ["sm", "md", "lg"], "default": "md" },
+        "dot": { "type": "boolean", "default": false },
+        "dotColor": { "type": "string", "default": "#17B26A" },
+        "count": { "type": "number", "default": 0 },
+        "checkbox": { "type": "boolean", "default": false },
+        "checked": { "type": "boolean", "default": false },
+        "disabled": { "type": "boolean", "default": false },
+        "children": { "type": "string", "default": "tag" }
+      }
+    },
+    {
+      "name": "Tabs",
+      "variants": 2,
+      "sizes": 2,
+      "file": "tabs.tsx",
+      "displaySize": "lg",
+      "examples": [
+        {
+          "name": "Underline",
+          "code": "<Tabs variant=\"underline\" items={[{label:\"Overview\",value:\"ov\"},{label:\"Tokens\",value:\"tk\"},{label:\"Components\",value:\"cp\"}]} defaultValue=\"ov\" />"
+        },
+        {
+          "name": "Filled",
+          "code": "<Tabs variant=\"filled\" items={[{label:\"Day\",value:\"d\"},{label:\"Week\",value:\"w\"},{label:\"Month\",value:\"m\"}]} defaultValue=\"d\" />"
+        },
+        {
+          "name": "Full width",
+          "code": "<Tabs fullWidth items={[{label:\"Home\",value:\"h\"},{label:\"Settings\",value:\"s\"}]} defaultValue=\"h\" />"
+        }
+      ],
+      "props": {
+        "variant": { "type": "enum", "values": ["underline", "filled"], "default": "underline" },
+        "size": { "type": "enum", "values": ["sm", "md"], "default": "sm" },
+        "orientation": { "type": "enum", "values": ["horizontal", "vertical"], "default": "horizontal" },
+        "fullWidth": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "name": "Close Button",
+      "variants": 1,
+      "sizes": 1,
+      "file": "close-button.tsx",
+      "displaySize": "sm",
+      "examples": [
+        { "name": "Default", "code": "<CloseButton />" },
+        { "name": "Small", "code": "<CloseButton size=\"sm\" />" },
+        { "name": "Large", "code": "<CloseButton size=\"lg\" />" },
+        { "name": "On dark", "code": "<div style={{background:\"#18181B\", padding:12, borderRadius:8}}><CloseButton darkBackground /></div>" }
+      ],
+      "props": {
+        "size": { "type": "enum", "values": ["sm", "md", "lg"], "default": "sm" },
+        "darkBackground": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "name": "Utility Button",
+      "variants": 1,
+      "sizes": 1,
+      "file": "utility-button.tsx",
+      "displaySize": "sm",
+      "examples": [
+        { "name": "Secondary", "code": "<UtilityButton />" },
+        { "name": "Tertiary", "code": "<UtilityButton hierarchy=\"tertiary\" />" },
+        { "name": "XS", "code": "<UtilityButton size=\"xs\" />" }
+      ],
+      "props": {
+        "size": { "type": "enum", "values": ["xs", "sm"], "default": "sm" },
+        "hierarchy": { "type": "enum", "values": ["secondary", "tertiary"], "default": "secondary" }
+      }
+    },
+    {
+      "name": "Social Button",
+      "variants": 1,
+      "sizes": 1,
+      "file": "social-button.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Google", "code": "<SocialButton platform=\"google\" showText />" },
+        { "name": "Apple", "code": "<SocialButton platform=\"apple\" theme=\"color\" showText />" },
+        { "name": "Twitter icon-only", "code": "<SocialButton platform=\"twitter\" />" },
+        { "name": "Large", "code": "<SocialButton platform=\"facebook\" size=\"lg\" showText />" }
+      ],
+      "props": {
+        "platform": { "type": "enum", "values": ["google", "facebook", "apple", "twitter"], "default": "google" },
+        "theme": { "type": "enum", "values": ["brand", "color", "gray"], "default": "brand" },
+        "size": { "type": "enum", "values": ["sm", "md", "lg", "xl"], "default": "md" },
+        "showText": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "name": "Icon",
+      "variants": 1,
+      "sizes": 1,
+      "file": "icon.tsx",
+      "displaySize": "sm",
+      "examples": [
+        { "name": "Default", "code": "<Icon />" },
+        { "name": "Large", "code": "<Icon size={48} />" },
+        { "name": "Brand color", "code": "<Icon size={32} color=\"#6E56CF\" />" }
+      ],
+      "props": {
+        "size": { "type": "number", "default": 24, "min": 8, "max": 128, "step": 4 },
+        "color": { "type": "string", "default": "currentColor" }
+      }
+    },
+    {
+      "name": "Verification Code Input",
+      "variants": 1,
+      "sizes": 2,
+      "file": "verification-code-input.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "6 digits", "code": "<VerificationCodeInput length={6} />" },
+        { "name": "4 digits", "code": "<VerificationCodeInput length={4} size=\"md\" />" },
+        { "name": "With label", "code": "<VerificationCodeInput length={6} label=\"Enter the code\" hint=\"Sent to your email\" />" },
+        { "name": "With error", "code": "<VerificationCodeInput length={6} error=\"Code is incorrect\" />" }
+      ],
+      "props": {
+        "length": { "type": "number", "default": 6, "min": 3, "max": 8, "step": 1 },
+        "size": { "type": "enum", "values": ["sm", "md"], "default": "sm" },
+        "label": { "type": "string", "default": "" },
+        "hint": { "type": "string", "default": "" },
+        "error": { "type": "string", "default": "" },
+        "disabled": { "type": "boolean", "default": false }
+      }
+    },
+    { "name": "App Navigation", "variants": 1, "sizes": 1, "file": "app-navigation.tsx", "displaySize": "xl" },
+    {
+      "name": "Code Block",
+      "variants": 1,
+      "sizes": 1,
+      "file": "code-block.tsx",
+      "displaySize": "lg",
+      "examples": [
+        { "name": "Short", "code": "<CodeBlock>npm install @hubera/core</CodeBlock>" },
+        { "name": "JavaScript", "code": "<CodeBlock>{`const sum = (a, b) => a + b;`}</CodeBlock>" },
+        { "name": "Multi-line", "code": "<CodeBlock>{`function greet(name) {\\n  return \\`Hello, \\${name}!\\`;\\n}`}</CodeBlock>" }
+      ],
+      "props": {
+        "children": { "type": "string", "default": "npm install @hubera/core", "multiline": true }
+      }
+    },
+    {
+      "name": "Design Tip",
+      "variants": 1,
+      "sizes": 1,
+      "file": "design-tip.tsx",
+      "displaySize": "md",
+      "examples": [
+        { "name": "Default", "code": "<DesignTip>Use semantic tokens, not raw hex.</DesignTip>" },
+        { "name": "With title", "code": "<DesignTip title=\"Accessibility\">Maintain 4.5:1 contrast for body text.</DesignTip>" }
+      ],
+      "props": {
+        "title": { "type": "string", "default": "Design guideline" },
+        "children": { "type": "string", "default": "Keep components composable and token-driven.", "multiline": true }
+      }
+    }
   ],
   "screenshots": {
     "preview": "screenshots/preview.png",

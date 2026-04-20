@@ -1,5 +1,5 @@
-import { SubmitClient } from "./submit-client";
+import { redirect } from "next/navigation";
 
 export default function SubmitPage() {
-  return <SubmitClient />;
+  redirect("/ingest/new");
 }

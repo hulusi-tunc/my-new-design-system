@@ -8,6 +8,9 @@ import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { HuberaLogo } from "@/components/brand/hubera-logo";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { DesignSystemsNav } from "@/components/design-systems-nav";
+import { useCurrentCategory } from "@/lib/use-current-category";
+import { getCategoryMeta } from "@/lib/platforms";
 
 // Remix icons — established project icon library
 import SearchLineIcon from "remixicon-react/SearchLineIcon";
@@ -112,6 +115,8 @@ export function DSTopNav() {
   const { theme, toggle } = useTheme();
   const t = getNd(theme);
   const pathname = usePathname();
+  const currentCategory = useCurrentCategory();
+  const categoryMeta = getCategoryMeta(currentCategory);
   const [searchFocused, setSearchFocused] = useState(false);
   const [avatarHovered, setAvatarHovered] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -150,7 +155,7 @@ export function DSTopNav() {
 
   const isActive = (href: string) => {
     if (href === "/catalog") {
-      return pathname === "/catalog" || pathname.startsWith("/ds/");
+      return pathname.startsWith("/catalog") || pathname.startsWith("/ds/");
     }
     return pathname === href || pathname.startsWith(href + "/");
   };
@@ -197,7 +202,7 @@ export function DSTopNav() {
     maxWidth: 560,
     height: 40,
     borderRadius: swatchRadii.full,
-    border: `1px solid ${searchFocused ? t.borderStrong : t.border}`,
+    border: "none",
     background: searchFocused ? t.surface : t.surfaceInk,
     display: "flex",
     alignItems: "center",
@@ -272,12 +277,10 @@ export function DSTopNav() {
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <NavLink
-            href="/catalog"
+          <DesignSystemsNav
             label="Design Systems"
+            variant="topnav"
             active={isActive("/catalog")}
-            color={t.textSecondary}
-            hoverColor={t.textDisplay}
           />
           <NavLink
             href="/skills"
@@ -297,11 +300,11 @@ export function DSTopNav() {
           </span>
           <input
             type="text"
-            placeholder="Search design systems, skills..."
+            placeholder={`Search ${categoryMeta.searchLabel} design systems…`}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={searchInputStyle}
-            aria-label="Global search"
+            aria-label={`Search ${categoryMeta.label} design systems`}
           />
           <span
             style={{

@@ -12,11 +12,16 @@
   "createdAt": "2025-03-01",
   "updatedAt": "2026-04-13",
   "parent": null,
+  "platform": "web-react",
   "repository": "https://github.com/hulusi-tunc/CESP-v2",
   "defaultBranch": "main",
   "installPath": "design-systems/cesp",
   "sourceLayout": {
-    "components": "src/components/ui"
+    "platform": "web-react",
+    "componentsDir": "src/components/ui",
+    "files": [
+      { "path": "src/app/globals.css", "role": "globalsCss" }
+    ]
   },
   "technology": ["react-18-19", "typescript", "tailwind-v4", "tsup"],
   "architecture": "css-variables",
@@ -127,8 +132,8 @@
       }
     },
     "typography": {
-      "fontFamily": "System UI",
-      "weights": ["400", "500", "600"],
+      "fontFamily": "Geist",
+      "weights": ["400", "500", "600", "700"],
       "scaleSteps": 6
     },
     "spacing": {

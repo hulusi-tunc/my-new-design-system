@@ -1,17 +1,31 @@
 "use client";
 
-import { useState, useMemo, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  type CSSProperties,
+} from "react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
+import { resolveDsTokens } from "@/lib/resolve-ds-tokens";
 import {
   ComponentPreview,
   categorizeComponent,
 } from "@/components/registry/component-preview";
-import type { DSComponent, DSTokens } from "@/lib/types";
+import { LiveComponentSandbox } from "@/components/registry/live-component-sandbox";
+import type { DSComponent, DSManifest, DSTokens } from "@/lib/types";
 
 export interface ComponentListProps {
   components: DSComponent[];
   tokens: DSTokens;
+  /**
+   * Optional manifest. If provided, tiles render a live Sandpack preview
+   * of each component (lazy-loaded on visibility). Without it, tiles fall
+   * back to the static mock preview.
+   */
+  manifest?: DSManifest;
 }
 
 const CATEGORY_ORDER = [
@@ -49,15 +63,48 @@ function ComponentTile({
   tokens,
   brandColor,
   index,
+  manifest,
 }: {
   component: DSComponent;
   tokens: DSTokens;
   brandColor: string;
   index: number;
+  manifest?: DSManifest;
 }) {
   const { theme } = useTheme();
   const t = getNd(theme);
+  const ds = useMemo(
+    () => resolveDsTokens(tokens, theme === "light" ? "light" : "dark"),
+    [tokens, theme]
+  );
   const [hovered, setHovered] = useState(false);
+
+  // Lazy-mount the live Sandpack preview when the tile first enters the viewport.
+  // This is critical — 14 sandboxes mounted eagerly would crush the page.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!manifest) return; // No live mode requested
+    if (visible) return;
+    const el = rootRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [manifest, visible]);
 
   const variants = component.variants ?? 0;
   const sizes = component.sizes ?? 0;
@@ -76,9 +123,11 @@ function ComponentTile({
     minHeight: 220,
   };
 
+  // Preview area: uses the DESIGN SYSTEM's own page background,
+  // so each DS preview looks like its own environment.
   const previewAreaStyle: CSSProperties = {
     flex: 1,
-    background: theme === "dark" ? t.surfaceInk : "rgb(250, 250, 252)",
+    background: ds.pageBg,
     borderBottom: `1px solid ${t.border}`,
     display: "flex",
     alignItems: "center",
@@ -89,13 +138,13 @@ function ComponentTile({
     overflow: "hidden",
   };
 
-  // Subtle dot-grid background pattern in preview area
+  // Subtle dot-grid using the DS's own border color
   const dotPatternStyle: CSSProperties = {
     position: "absolute",
     inset: 0,
-    backgroundImage: `radial-gradient(${t.border} 1px, transparent 1px)`,
+    backgroundImage: `radial-gradient(${ds.border} 1px, transparent 1px)`,
     backgroundSize: "16px 16px",
-    opacity: 0.5,
+    opacity: 0.4,
     pointerEvents: "none",
   };
 
@@ -147,8 +196,11 @@ function ComponentTile({
   if (variants > 0) metaParts.push(`${variants} VAR`);
   if (sizes > 0) metaParts.push(`${sizes} SIZE`);
 
+  const useLive = Boolean(manifest);
+
   return (
     <div
+      ref={rootRef}
       style={tileStyle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -156,12 +208,40 @@ function ComponentTile({
       aria-label={component.name}
     >
       {/* Preview area */}
-      <div style={previewAreaStyle}>
-        <div style={dotPatternStyle} />
-        <div style={previewContentStyle}>
-          <ComponentPreview name={component.name} tokens={tokens} />
+      {useLive && manifest ? (
+        visible ? (
+          <LiveComponentSandbox
+            manifest={manifest}
+            component={component}
+            height={200}
+            bare
+          />
+        ) : (
+          <div style={previewAreaStyle}>
+            <div style={dotPatternStyle} />
+            <div style={previewContentStyle}>
+              <span
+                style={{
+                  fontFamily: editorialFonts.mono,
+                  fontSize: 10,
+                  color: ds.textDisabled,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Scroll to preview
+              </span>
+            </div>
+          </div>
+        )
+      ) : (
+        <div style={previewAreaStyle}>
+          <div style={dotPatternStyle} />
+          <div style={previewContentStyle}>
+            <ComponentPreview name={component.name} tokens={tokens} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Footer: name + meta + index */}
       <div style={footerStyle}>
@@ -185,12 +265,14 @@ function CategorySection({
   tokens,
   brandColor,
   startIndex,
+  manifest,
 }: {
   title: string;
   components: DSComponent[];
   tokens: DSTokens;
   brandColor: string;
   startIndex: number;
+  manifest?: DSManifest;
 }) {
   const { theme } = useTheme();
   const t = getNd(theme);
@@ -251,6 +333,7 @@ function CategorySection({
             tokens={tokens}
             brandColor={brandColor}
             index={startIndex + i}
+            manifest={manifest}
           />
         ))}
       </div>
@@ -260,7 +343,7 @@ function CategorySection({
 
 /* ── List wrapper ─────────────────────────────────── */
 
-export function ComponentList({ components, tokens }: ComponentListProps) {
+export function ComponentList({ components, tokens, manifest }: ComponentListProps) {
   const { theme } = useTheme();
   const t = getNd(theme);
   const brandColor = useMemo(() => getBrandFromTokens(tokens), [tokens]);
@@ -310,6 +393,7 @@ export function ComponentList({ components, tokens }: ComponentListProps) {
           tokens={tokens}
           brandColor={brandColor}
           startIndex={start}
+          manifest={manifest}
         />
       ))}
     </div>

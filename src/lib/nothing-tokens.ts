@@ -40,16 +40,18 @@ export const swatchTokens = {
     interactive: "oklch(0.68 0.18 240)",
   },
   light: {
-    // Page surfaces — cool near-white
-    black: "oklch(0.985 0.002 260)", // page background (API name kept)
-    surface: "oklch(1 0 0)", // pure white for cards
-    surfaceRaised: "oklch(0.98 0.003 260)", // hover
-    surfaceInk: "oklch(0.965 0.004 260)", // inset
+    // Page surfaces — pure white page, light-gray cards (swapped from before).
+    // The page is the flattest, brightest surface; cards stack ~gray-100
+    // above it and deeper surfaces step toward gray-200 / gray-300.
+    black: "oklch(1 0 0)", // page background — pure white (API name kept)
+    surface: "oklch(0.965 0.004 260)", // card background ~gray-100
+    surfaceRaised: "oklch(0.945 0.005 260)", // hover / elevated ~gray-200
+    surfaceInk: "oklch(0.92 0.006 260)", // inset / deepest ~gray-300
 
-    // Borders
-    border: "oklch(0.92 0.006 260)",
-    borderVisible: "oklch(0.86 0.008 260)",
-    borderStrong: "oklch(0.72 0.01 260)",
+    // Borders — slightly darker than before so cards on a white page read cleanly
+    border: "oklch(0.9 0.007 260)",
+    borderVisible: "oklch(0.83 0.009 260)",
+    borderStrong: "oklch(0.68 0.011 260)",
 
     // Text
     textDisabled: "oklch(0.68 0.008 260)",

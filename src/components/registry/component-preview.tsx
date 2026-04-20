@@ -2,118 +2,59 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useTheme } from "@/components/providers/theme-provider";
-import { getNd } from "@/lib/nothing-tokens";
-import type { DSTokens, DSTokenColors } from "@/lib/types";
+import {
+  resolveDsTokens,
+  type ResolvedDsTokens,
+} from "@/lib/resolve-ds-tokens";
+import type { DSTokens } from "@/lib/types";
 
-/* ─── Token extractors ─────────────────────────────── */
-
-function getBrandColor(colors: DSTokenColors): string {
-  for (const key of ["brand", "primary", "blue", "indigo", "violet", "purple"]) {
-    const scale = colors[key];
-    if (scale && typeof scale === "object") {
-      const record = scale as Record<string, string>;
-      const shade =
-        record["600"] ?? record["500"] ?? record["700"] ?? Object.values(record)[0];
-      if (shade) return shade;
-    }
-  }
-  for (const value of Object.values(colors)) {
-    if (value && typeof value === "object") {
-      const record = value as Record<string, string>;
-      const shade = record["600"] ?? record["500"] ?? Object.values(record)[0];
-      if (shade) return shade;
-    }
-  }
-  return "#666666";
-}
-
-function getBrandLight(colors: DSTokenColors): string {
-  for (const key of ["brand", "primary", "blue", "indigo", "violet", "purple"]) {
-    const scale = colors[key];
-    if (scale && typeof scale === "object") {
-      const record = scale as Record<string, string>;
-      const shade = record["50"] ?? record["100"] ?? record["200"];
-      if (shade) return shade;
-    }
-  }
-  return "rgba(0,0,0,0.05)";
-}
-
-function getBrandDark(colors: DSTokenColors): string {
-  for (const key of ["brand", "primary", "blue", "indigo", "violet", "purple"]) {
-    const scale = colors[key];
-    if (scale && typeof scale === "object") {
-      const record = scale as Record<string, string>;
-      const shade = record["700"] ?? record["800"] ?? record["600"];
-      if (shade) return shade;
-    }
-  }
-  return "#444444";
-}
-
-function getStatusColor(colors: DSTokenColors, kind: "success" | "warning" | "error"): string {
-  const scale = colors[kind];
-  if (scale && typeof scale === "object") {
-    const record = scale as Record<string, string>;
-    return record["500"] ?? record["600"] ?? Object.values(record)[0] ?? "#666";
-  }
-  if (kind === "success") return "#16a34a";
-  if (kind === "warning") return "#eab308";
-  return "#dc2626";
-}
-
-function getRadius(tokens: DSTokens, size: "sm" | "md" | "lg"): number {
-  const full = tokens.radius.full;
-  if (size === "sm") return Math.min(4, full);
-  if (size === "lg") return Math.min(12, full);
-  return Math.min(8, full);
-}
-
-function getFont(tokens: DSTokens): string {
-  return tokens.typography.fontFamily || "system-ui, sans-serif";
-}
-
-/* ─── Render context ──────────────────────────────── */
-
-interface Ctx {
-  font: string;
-  brand: string;
-  brandLight: string;
-  brandDark: string;
-  success: string;
-  warning: string;
-  error: string;
-  radiusSm: number;
-  radiusMd: number;
-  radiusLg: number;
-  surface: string;
-  border: string;
-  textPrimary: string;
-  textSecondary: string;
-  textDisabled: string;
-}
+/**
+ * ComponentPreview renders a mock of a specific named component using
+ * ONLY the design system's own resolved tokens.
+ *
+ * The preview never falls back to Hubera's own theme — surfaces, borders,
+ * text colors, typography, radii all come from the DS manifest. This is
+ * what makes each DS preview look like its own world.
+ */
 
 /* ─── Helpers ─────────────────────────────────────── */
 
 function hexToRgba(hex: string, alpha: number): string {
   if (!hex.startsWith("#")) return `rgba(0,0,0,${alpha})`;
   const cleaned = hex.replace("#", "");
-  const full = cleaned.length === 3
-    ? cleaned.split("").map((ch) => ch + ch).join("")
-    : cleaned;
+  const full =
+    cleaned.length === 3
+      ? cleaned
+          .split("")
+          .map((ch) => ch + ch)
+          .join("")
+      : cleaned;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function softBrand(c: ResolvedDsTokens, alpha = 0.12): string {
+  // For hex, use alpha. For non-hex (rgba, oklch), fall back to brandLight
+  if (c.brand.startsWith("#")) return hexToRgba(c.brand, alpha);
+  return c.brandLight;
+}
+
+function softStatus(color: string, alpha = 0.12, fallback: string): string {
+  if (color.startsWith("#")) return hexToRgba(color, alpha);
+  return fallback;
+}
+
 function normalizeName(name: string): string {
   return name.toLowerCase().replace(/[\s_-]/g, "");
 }
 
-/* ─── Renderers ───────────────────────────────────── */
+/* ─── Renderers (all consume ResolvedDsTokens) ───── */
 
-const renderers: Record<string, (c: Ctx) => ReactNode> = {
+type Renderer = (c: ResolvedDsTokens) => ReactNode;
+
+const renderers: Record<string, Renderer> = {
   /* ── BUTTONS ─────────────────────────────────── */
 
   button: (c) => (
@@ -123,12 +64,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           background: c.brand,
-          color: "#ffffff",
+          color: c.textOnBrand,
           border: "none",
           borderRadius: c.radiusMd,
           padding: "9px 18px",
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           cursor: "default",
           letterSpacing: "-0.005em",
         }}
@@ -145,7 +86,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           borderRadius: c.radiusMd,
           padding: "7.5px 16px",
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           cursor: "default",
           letterSpacing: "-0.005em",
         }}
@@ -162,12 +103,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           background: c.brand,
-          color: "#fff",
+          color: c.textOnBrand,
           border: "none",
           borderRadius: c.radiusSm,
           padding: "5px 12px",
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           cursor: "default",
         }}
       >
@@ -183,7 +124,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           borderRadius: c.radiusSm,
           padding: "5px 12px",
           fontSize: 11,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
           cursor: "default",
         }}
       >
@@ -198,17 +139,20 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
       style={{
         fontFamily: c.font,
         background: `linear-gradient(135deg, ${c.brand} 0%, ${c.brandDark} 100%)`,
-        color: "#ffffff",
+        color: c.textOnBrand,
         border: "none",
         borderRadius: c.radiusLg,
         padding: "12px 24px 12px 22px",
         fontSize: 13,
-        fontWeight: 700,
+        fontWeight: Number(c.weightBold),
         cursor: "default",
         display: "inline-flex",
         alignItems: "center",
         gap: 10,
-        boxShadow: `0 8px 24px -8px ${hexToRgba(c.brand, 0.5)}, inset 0 1px 0 ${hexToRgba("#ffffff", 0.18)}`,
+        boxShadow: `0 8px 24px -8px ${softBrand(c, 0.5)}, inset 0 1px 0 ${hexToRgba(
+          "#ffffff",
+          0.18
+        )}`,
         letterSpacing: "-0.005em",
       }}
     >
@@ -228,7 +172,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           fontFamily: c.font,
           color: c.brand,
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           textDecoration: "none",
           display: "inline-flex",
           alignItems: "center",
@@ -247,7 +191,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           fontFamily: c.font,
           color: c.textSecondary,
           fontSize: 13,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
           textDecoration: "underline",
           textUnderlineOffset: 3,
         }}
@@ -266,7 +210,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           height: 36,
           borderRadius: c.radiusMd,
           background: c.brand,
-          color: "#fff",
+          color: c.textOnBrand,
           border: "none",
           display: "inline-flex",
           alignItems: "center",
@@ -284,7 +228,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           width: 36,
           height: 36,
           borderRadius: c.radiusMd,
-          background: "transparent",
+          background: c.surface,
           color: c.textPrimary,
           border: `1px solid ${c.border}`,
           display: "inline-flex",
@@ -308,8 +252,8 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
       style={{
         width: 32,
         height: 32,
-        borderRadius: 999,
-        background: "transparent",
+        borderRadius: c.radiusFull,
+        background: c.surface,
         border: `1px solid ${c.border}`,
         color: c.textPrimary,
         cursor: "default",
@@ -330,13 +274,13 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
       type="button"
       style={{
         fontFamily: c.font,
-        background: "transparent",
+        background: c.surface,
         color: c.textPrimary,
         border: `1px solid ${c.border}`,
         borderRadius: c.radiusMd,
         padding: "8px 14px",
         fontSize: 12,
-        fontWeight: 500,
+        fontWeight: Number(c.weightMedium),
         cursor: "default",
         display: "inline-flex",
         alignItems: "center",
@@ -361,7 +305,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         borderRadius: c.radiusMd,
         padding: "9px 16px",
         fontSize: 13,
-        fontWeight: 600,
+        fontWeight: Number(c.weightSemibold),
         cursor: "default",
         display: "inline-flex",
         alignItems: "center",
@@ -383,7 +327,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           fontSize: 11,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
           color: c.textSecondary,
           letterSpacing: "0.01em",
         }}
@@ -404,7 +348,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           fontSize: 13,
           outline: "none",
           width: "100%",
-          boxShadow: `0 0 0 3px ${hexToRgba(c.brand, 0.1)}`,
+          boxShadow: `0 0 0 3px ${softBrand(c, 0.1)}`,
         }}
       />
     </div>
@@ -450,13 +394,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         <circle cx="11" cy="11" r="8" />
         <line x1="21" y1="21" x2="16.65" y2="16.65" />
       </svg>
-      <span
-        style={{
-          fontFamily: c.font,
-          fontSize: 13,
-          color: c.textSecondary,
-        }}
-      >
+      <span style={{ fontFamily: c.font, fontSize: 13, color: c.textSecondary }}>
         Search components...
       </span>
     </div>
@@ -476,7 +414,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             justifyContent: "center",
           }}
         >
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={c.textOnBrand} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
@@ -515,14 +453,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             justifyContent: "center",
           }}
         >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: c.brand,
-            }}
-          />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.brand }} />
         </div>
         <span style={{ fontFamily: c.font, fontSize: 13, color: c.textPrimary }}>
           Monthly
@@ -558,7 +489,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           justifyContent: "flex-end",
         }}
       >
-        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#fff" }} />
+        <div style={{ width: 18, height: 18, borderRadius: "50%", background: c.textOnBrand }} />
       </div>
       <div
         style={{
@@ -605,10 +536,10 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             width: 16,
             height: 16,
             borderRadius: "50%",
-            background: "#fff",
+            background: c.surface,
             border: `2px solid ${c.brand}`,
             transform: "translate(-50%, -50%)",
-            boxShadow: `0 0 0 4px ${hexToRgba(c.brand, 0.12)}`,
+            boxShadow: `0 0 0 4px ${softBrand(c, 0.12)}`,
           }}
         />
       </div>
@@ -631,9 +562,9 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             alignItems: "center",
             justifyContent: "center",
             fontSize: 16,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
             color: c.textPrimary,
-            boxShadow: i === 3 ? `0 0 0 3px ${hexToRgba(c.brand, 0.12)}` : undefined,
+            boxShadow: i === 3 ? `0 0 0 3px ${softBrand(c, 0.12)}` : undefined,
           }}
         >
           {digit}
@@ -665,9 +596,9 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           style={{
             fontFamily: c.font,
             fontSize: 13,
-            fontWeight: item.active ? 600 : 500,
+            fontWeight: Number(item.active ? c.weightSemibold : c.weightMedium),
             color: item.active ? c.brand : c.textPrimary,
-            background: item.active ? hexToRgba(c.brand, 0.08) : "transparent",
+            background: item.active ? softBrand(c, 0.08) : "transparent",
             padding: "8px 14px",
           }}
         >
@@ -689,7 +620,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           padding: "3px 10px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
         }}
       >
         New
@@ -698,11 +629,11 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           background: c.brand,
-          color: "#fff",
+          color: c.textOnBrand,
           padding: "3px 10px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
         }}
       >
         Active
@@ -716,7 +647,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           padding: "2px 9px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
         }}
       >
         Draft
@@ -736,7 +667,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         borderRadius: 999,
         fontFamily: c.font,
         fontSize: 11,
-        fontWeight: 600,
+        fontWeight: Number(c.weightSemibold),
       }}
     >
       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -750,7 +681,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           padding: "2px 8px",
           borderRadius: 999,
           fontSize: 10,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
         }}
       >
         v2.0
@@ -766,12 +697,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          background: hexToRgba(c.success, 0.12),
+          background: softStatus(c.success, 0.12, c.brandLight),
           color: c.success,
           padding: "3px 10px 3px 8px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           width: "fit-content",
         }}
       >
@@ -784,12 +715,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          background: hexToRgba(c.warning, 0.12),
+          background: softStatus(c.warning, 0.12, c.brandLight),
           color: c.warning,
           padding: "3px 10px 3px 8px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           width: "fit-content",
         }}
       >
@@ -802,12 +733,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          background: hexToRgba(c.error, 0.12),
+          background: softStatus(c.error, 0.12, c.brandLight),
           color: c.error,
           padding: "3px 10px 3px 8px",
           borderRadius: 999,
           fontSize: 11,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           width: "fit-content",
         }}
       >
@@ -830,7 +761,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             padding: "3px 10px",
             borderRadius: c.radiusSm,
             fontSize: 11,
-            fontWeight: 500,
+            fontWeight: Number(c.weightMedium),
           }}
         >
           {tag}
@@ -840,10 +771,10 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
   ),
 
   avatar: (c) => (
-    <div style={{ display: "flex", gap: -8, alignItems: "center" }}>
+    <div style={{ display: "flex", alignItems: "center" }}>
       {[
-        { letter: "A", bg: c.brand },
-        { letter: "B", bg: c.brandDark },
+        { letter: "A", bg: c.brand, color: c.textOnBrand },
+        { letter: "B", bg: c.brandDark, color: c.textOnBrand },
         { letter: "C", bg: c.brandLight, color: c.brandDark },
       ].map((a, i) => (
         <div
@@ -853,14 +784,14 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             height: 36,
             borderRadius: "50%",
             background: a.bg,
-            color: a.color ?? "#fff",
+            color: a.color,
             border: `2px solid ${c.surface}`,
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             fontFamily: c.font,
             fontSize: 13,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
             marginLeft: i === 0 ? 0 : -10,
             boxShadow: `0 0 0 1px ${c.border}`,
           }}
@@ -903,7 +834,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           fontSize: 13,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           color: c.textPrimary,
           marginBottom: 4,
         }}
@@ -938,7 +869,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           fontSize: 10,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
           color: c.textSecondary,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
@@ -951,7 +882,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         style={{
           fontFamily: c.font,
           fontSize: 24,
-          fontWeight: 700,
+          fontWeight: Number(c.weightBold),
           color: c.textPrimary,
           letterSpacing: "-0.02em",
           marginBottom: 4,
@@ -967,7 +898,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           fontFamily: c.font,
           fontSize: 11,
           color: c.success,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
         }}
       >
         <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
@@ -981,20 +912,14 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
   divider: (c) => (
     <div style={{ width: "100%", maxWidth: 240 }}>
       <div style={{ height: 1, background: c.border, marginBottom: 16 }} />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1, height: 1, background: c.border }} />
         <span
           style={{
             fontFamily: c.font,
             fontSize: 11,
             color: c.textSecondary,
-            fontWeight: 500,
+            fontWeight: Number(c.weightMedium),
           }}
         >
           OR
@@ -1023,7 +948,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             color: i === 0 ? c.brand : c.textSecondary,
             padding: "8px 16px",
             fontSize: 12,
-            fontWeight: i === 0 ? 600 : 500,
+            fontWeight: Number(i === 0 ? c.weightSemibold : c.weightMedium),
             borderBottom: i === 0 ? `2px solid ${c.brand}` : "2px solid transparent",
             marginBottom: -1,
           }}
@@ -1057,15 +982,11 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           flexShrink: 0,
         }}
       />
-      <span style={{ fontFamily: c.font, fontSize: 12, fontWeight: 600, color: c.brand }}>
+      <span style={{ fontFamily: c.font, fontSize: 12, fontWeight: Number(c.weightSemibold), color: c.brand }}>
         Home
       </span>
-      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary }}>
-        About
-      </span>
-      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary }}>
-        Docs
-      </span>
+      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary }}>About</span>
+      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary }}>Docs</span>
     </div>
   ),
 
@@ -1084,7 +1005,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
       <span style={{ color: c.textDisabled }}>/</span>
       <span>Components</span>
       <span style={{ color: c.textDisabled }}>/</span>
-      <span style={{ color: c.brand, fontWeight: 600 }}>Button</span>
+      <span style={{ color: c.brand, fontWeight: Number(c.weightSemibold) }}>Button</span>
     </div>
   ),
 
@@ -1099,21 +1020,19 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             height: 28,
             borderRadius: c.radiusSm,
             background: n === 2 ? c.brand : "transparent",
-            color: n === 2 ? "#fff" : c.textPrimary,
+            color: n === 2 ? c.textOnBrand : c.textPrimary,
             border: n === 2 ? "none" : `1px solid ${c.border}`,
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
           }}
         >
           {n}
         </span>
       ))}
-      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary, padding: "0 4px" }}>
-        ...
-      </span>
+      <span style={{ fontFamily: c.font, fontSize: 12, color: c.textSecondary, padding: "0 4px" }}>...</span>
     </div>
   ),
 
@@ -1137,9 +1056,9 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           display: "grid",
           gridTemplateColumns: "1.4fr 1fr 0.8fr",
           padding: "8px 12px",
-          background: hexToRgba(c.brand, 0.06),
+          background: softBrand(c, 0.06),
           borderBottom: `1px solid ${c.border}`,
-          fontWeight: 600,
+          fontWeight: Number(c.weightSemibold),
           color: c.textSecondary,
           fontSize: 10,
           textTransform: "uppercase",
@@ -1163,12 +1082,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             padding: "7px 12px",
             color: c.textPrimary,
             borderTop: i > 0 ? `1px solid ${c.border}` : "none",
-            fontWeight: 500,
+            fontWeight: Number(c.weightMedium),
           }}
         >
           <span>{row.name}</span>
           <span style={{ color: c.textSecondary }}>{row.email}</span>
-          <span style={{ textAlign: "right", color: c.brand, fontWeight: 600 }}>
+          <span style={{ textAlign: "right", color: c.brand, fontWeight: Number(c.weightSemibold) }}>
             {row.role}
           </span>
         </div>
@@ -1189,12 +1108,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
               width: 28,
               height: 28,
               borderRadius: "50%",
-              background:
-                s.state === "done"
-                  ? c.brand
-                  : s.state === "active"
-                    ? c.surface
-                    : c.surface,
+              background: s.state === "done" ? c.brand : c.surface,
               border:
                 s.state === "active"
                   ? `2px solid ${c.brand}`
@@ -1203,7 +1117,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
                     : "none",
               color:
                 s.state === "done"
-                  ? "#fff"
+                  ? c.textOnBrand
                   : s.state === "active"
                     ? c.brand
                     : c.textDisabled,
@@ -1212,7 +1126,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
               justifyContent: "center",
               fontFamily: c.font,
               fontSize: 12,
-              fontWeight: 700,
+              fontWeight: Number(c.weightBold),
               flexShrink: 0,
             }}
           >
@@ -1250,20 +1164,13 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           fontSize: 11,
           color: c.textSecondary,
           marginBottom: 6,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
         }}
       >
         <span>Uploading…</span>
-        <span style={{ color: c.textPrimary, fontWeight: 600 }}>74%</span>
+        <span style={{ color: c.textPrimary, fontWeight: Number(c.weightSemibold) }}>74%</span>
       </div>
-      <div
-        style={{
-          height: 6,
-          borderRadius: 999,
-          background: c.border,
-          overflow: "hidden",
-        }}
-      >
+      <div style={{ height: 6, borderRadius: 999, background: c.border, overflow: "hidden" }}>
         <div style={{ width: "74%", height: "100%", background: c.brand }} />
       </div>
     </div>
@@ -1272,12 +1179,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
   spinner: (c) => (
     <svg width={28} height={28} viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="10" stroke={c.border} strokeWidth={2.5} />
-      <path
-        d="M22 12a10 10 0 0 0-10-10"
-        stroke={c.brand}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-      />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke={c.brand} strokeWidth={2.5} strokeLinecap="round" />
     </svg>
   ),
 
@@ -1290,7 +1192,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         gap: 12,
         padding: "12px 14px",
         background: c.brandLight,
-        border: `1px solid ${hexToRgba(c.brand, 0.2)}`,
+        border: `1px solid ${softBrand(c, 0.2)}`,
         borderRadius: c.radiusMd,
         width: "100%",
         maxWidth: 260,
@@ -1316,7 +1218,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           style={{
             fontFamily: c.font,
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
             color: c.brandDark,
             marginBottom: 2,
           }}
@@ -1344,8 +1246,8 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         display: "flex",
         gap: 10,
         padding: "10px 12px",
-        background: hexToRgba(c.warning, 0.1),
-        border: `1px solid ${hexToRgba(c.warning, 0.3)}`,
+        background: softStatus(c.warning, 0.1, c.brandLight),
+        border: `1px solid ${softStatus(c.warning, 0.3, c.border)}`,
         borderLeft: `3px solid ${c.warning}`,
         borderRadius: c.radiusSm,
         width: "100%",
@@ -1358,7 +1260,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
       <div>
-        <div style={{ fontFamily: c.font, fontSize: 12, fontWeight: 600, color: c.textPrimary }}>
+        <div style={{ fontFamily: c.font, fontSize: 12, fontWeight: Number(c.weightSemibold), color: c.textPrimary }}>
           Heads up
         </div>
         <div style={{ fontFamily: c.font, fontSize: 11, color: c.textSecondary }}>
@@ -1388,7 +1290,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           width: 22,
           height: 22,
           borderRadius: "50%",
-          background: hexToRgba(c.success, 0.15),
+          background: softStatus(c.success, 0.15, c.brandLight),
           color: c.success,
           display: "inline-flex",
           alignItems: "center",
@@ -1400,7 +1302,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <span style={{ fontFamily: c.font, fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
+      <span style={{ fontFamily: c.font, fontSize: 12, fontWeight: Number(c.weightMedium), color: c.textPrimary }}>
         Changes saved successfully
       </span>
     </div>
@@ -1416,7 +1318,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           padding: "5px 10px",
           borderRadius: c.radiusSm,
           fontSize: 11,
-          fontWeight: 500,
+          fontWeight: Number(c.weightMedium),
         }}
       >
         Copy to clipboard
@@ -1430,7 +1332,6 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           borderTop: `5px solid ${c.textPrimary}`,
         }}
       />
-      <div style={{ marginTop: 4, color: c.textSecondary, fontSize: 16 }}>⎘</div>
     </div>
   ),
 
@@ -1446,7 +1347,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
         boxShadow: `0 12px 32px -10px rgba(0,0,0,0.25)`,
       }}
     >
-      <div style={{ fontFamily: c.font, fontSize: 13, fontWeight: 700, color: c.textPrimary, marginBottom: 4 }}>
+      <div style={{ fontFamily: c.font, fontSize: 13, fontWeight: Number(c.weightBold), color: c.textPrimary, marginBottom: 4 }}>
         Confirm action
       </div>
       <div style={{ fontFamily: c.font, fontSize: 11, color: c.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
@@ -1462,7 +1363,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
             border: "none",
             padding: "5px 10px",
             fontSize: 11,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
             cursor: "default",
           }}
         >
@@ -1473,12 +1374,12 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
           style={{
             fontFamily: c.font,
             background: c.brand,
-            color: "#fff",
+            color: c.textOnBrand,
             border: "none",
             borderRadius: c.radiusSm,
             padding: "5px 12px",
             fontSize: 11,
-            fontWeight: 600,
+            fontWeight: Number(c.weightSemibold),
             cursor: "default",
           }}
         >
@@ -1493,7 +1394,7 @@ const renderers: Record<string, (c: Ctx) => ReactNode> = {
   codeblock: (c) => (
     <pre
       style={{
-        fontFamily: "ui-monospace, 'SFMono-Regular', Menlo, monospace",
+        fontFamily: c.fontMono,
         background: c.surface,
         border: `1px solid ${c.border}`,
         borderRadius: c.radiusMd,
@@ -1523,31 +1424,13 @@ interface ComponentPreviewProps {
 
 export function ComponentPreview({ name, tokens }: ComponentPreviewProps) {
   const { theme } = useTheme();
-  const t = getNd(theme);
-
-  const ctx: Ctx = {
-    font: getFont(tokens),
-    brand: getBrandColor(tokens.colors),
-    brandLight: getBrandLight(tokens.colors),
-    brandDark: getBrandDark(tokens.colors),
-    success: getStatusColor(tokens.colors, "success"),
-    warning: getStatusColor(tokens.colors, "warning"),
-    error: getStatusColor(tokens.colors, "error"),
-    radiusSm: getRadius(tokens, "sm"),
-    radiusMd: getRadius(tokens, "md"),
-    radiusLg: getRadius(tokens, "lg"),
-    surface: t.surface,
-    border: t.borderVisible,
-    textPrimary: t.textPrimary,
-    textSecondary: t.textSecondary,
-    textDisabled: t.textDisabled,
-  };
+  const ctx = resolveDsTokens(tokens, theme === "light" ? "light" : "dark");
 
   const normalized = normalizeName(name);
-  // Try exact match first (so `compactbutton` doesn't fall through to `button`)
+  // Exact match first
   let renderer = renderers[normalized];
 
-  // Fallback: prefer LONGER keys first so "searchinput" matches "input" only if no specific key fits
+  // Fallback: longest-key first so e.g. "searchinput" matches "searchinput" not "input"
   if (!renderer) {
     const sortedKeys = Object.keys(renderers).sort((a, b) => b.length - a.length);
     for (const key of sortedKeys) {
@@ -1570,14 +1453,14 @@ export function ComponentPreview({ name, tokens }: ComponentPreviewProps) {
     return <div style={containerStyle}>{renderer(ctx)}</div>;
   }
 
-  // Generic fallback: show the name in the DS's own font, large
+  // Generic fallback: show the name in the DS's own font
   return (
     <div style={containerStyle}>
       <span
         style={{
           fontFamily: ctx.font,
           fontSize: 18,
-          fontWeight: 600,
+          fontWeight: Number(ctx.weightSemibold),
           color: ctx.textSecondary,
           letterSpacing: "-0.01em",
         }}
@@ -1605,4 +1488,71 @@ export function categorizeComponent(name: string): string {
   if (/code|console|terminal|snippet/.test(n)) return "Code";
   if (/icon/.test(n)) return "Display";
   return "Other";
+}
+
+/* ─── Size hint inference ─────────────────────────── */
+
+/**
+ * Infers a preview-frame size class from a component name.
+ * Returns one of: "sm" | "md" | "lg" | "xl".
+ * Longest-pattern-first check so "verification code input" doesn't fall
+ * through to "input".
+ */
+export function inferDisplaySize(name: string): "sm" | "md" | "lg" | "xl" {
+  const n = name.toLowerCase();
+
+  // XL — must fit real page-level components at roughly actual size
+  if (/table|sidebar|modal|app\s*navigation|data.?table|layout|drawer|sheet/.test(n)) {
+    return "xl";
+  }
+
+  // LG — medium-sized rich composites
+  if (
+    /card|metric|code\s*block|step.?indicator|progress|breadcrumb|pagination|design.?tip|form|row/.test(
+      n
+    )
+  ) {
+    return "lg";
+  }
+
+  // MD — single-element inputs and feedback surfaces
+  if (
+    /textarea|verification|tabs|tooltip|toast|alert|popover|dropdown|menu|select|slider|tag.?group|badge.?group/.test(
+      n
+    )
+  ) {
+    return "md";
+  }
+
+  // Input is MD
+  if (/^input$|^input\b/.test(n)) return "md";
+
+  // SM — buttons, badges, single-glyph items
+  if (
+    /button|badge|tag|icon|avatar|checkbox|radio|switch|spinner|close|chip/.test(
+      n
+    )
+  ) {
+    return "sm";
+  }
+
+  // Default: medium
+  return "md";
+}
+
+/** Pixel dimensions for a given display size. */
+export function displaySizeFrame(size: "sm" | "md" | "lg" | "xl"): {
+  width: number | string;
+  height: number;
+} {
+  switch (size) {
+    case "sm":
+      return { width: 480, height: 320 };
+    case "md":
+      return { width: 640, height: 400 };
+    case "lg":
+      return { width: 800, height: 480 };
+    case "xl":
+      return { width: "100%", height: 640 };
+  }
 }

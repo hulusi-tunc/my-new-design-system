@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./supabase/types";
-import type { DSManifest } from "./types";
+import type { DSManifest, DSPlatform } from "./types";
+import { getCategoryMeta, type PlatformCategory } from "./platforms";
 
 /**
  * Stateless public Supabase client for reading published design systems.
@@ -48,6 +49,45 @@ export async function getManifestBySlug(
   if (error || !data) return null;
   const row = data as unknown as ManifestRow;
   return (row.manifest as DSManifest | null) ?? null;
+}
+
+export async function getManifestsByPlatform(
+  platform: DSPlatform
+): Promise<DSManifest[]> {
+  const supabase = getPublicClient();
+  const { data, error } = await supabase
+    .from("design_systems")
+    .select("manifest")
+    .eq("published", true)
+    .eq("platform", platform)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) return [];
+  const rows = data as unknown as ManifestRow[];
+  return rows
+    .map((row) => row.manifest as DSManifest | null)
+    .filter((m): m is DSManifest => m !== null);
+}
+
+export async function getManifestsByCategory(
+  category: PlatformCategory
+): Promise<DSManifest[]> {
+  const meta = getCategoryMeta(category);
+  const supabase = getPublicClient();
+  // Filter by the JSONB `manifest.platform` field — works whether or not
+  // the dedicated `platform` column has been migrated in yet.
+  const { data, error } = await supabase
+    .from("design_systems")
+    .select("manifest")
+    .eq("published", true)
+    .in("manifest->>platform", meta.platforms as string[])
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) return [];
+  const rows = data as unknown as ManifestRow[];
+  return rows
+    .map((row) => row.manifest as DSManifest | null)
+    .filter((m): m is DSManifest => m !== null);
 }
 
 export async function getAllSlugs(): Promise<string[]> {

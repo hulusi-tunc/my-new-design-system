@@ -32,7 +32,7 @@ export function HuberaLogo({
         fill="currentColor"
         xmlns="http://www.w3.org/2000/svg"
         className={className}
-        style={style}
+        style={{ display: "block", ...style }}
         role="img"
         aria-label={ariaLabel}
       >

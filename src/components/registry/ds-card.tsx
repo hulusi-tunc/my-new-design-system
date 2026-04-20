@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
@@ -21,6 +21,28 @@ export function DSCard({ manifest, forkCount = 0 }: DSCardProps) {
   const t = getNd(theme);
   const [hover, setHover] = useState(false);
 
+  // Lazy flag — becomes true once the card has ever entered the viewport.
+  // Passed to the carousel so the heavy live-component Sandpack iframe on the
+  // Components slide only mounts for cards the user can actually see.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    if (inView) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
+
   // Try to extract a single brand dot color from manifest tokens
   const brandDot = extractBrandColor(manifest.tokens?.colors, t.accent);
 
@@ -37,20 +59,26 @@ export function DSCard({ manifest, forkCount = 0 }: DSCardProps) {
         color: "inherit",
       }}
     >
-      {/* Card: large visual carousel preview */}
+      {/* Card: large visual carousel preview.
+          `containerType: inline-size` lets slide contents scale with the card's
+          rendered width via `cqw` units, so the preview looks right across the
+          3-col / 2-col / 1-col responsive grid. No border — the uniform warm-
+          gray card background (set inside the carousel) separates it from the
+          page. */}
       <div
+        ref={rootRef}
         style={{
           aspectRatio: "4 / 3",
-          borderRadius: swatchRadii.lg,
-          border: `1px solid ${hover ? t.borderVisible : t.border}`,
+          borderRadius: 20,
+          border: "none",
           overflow: "hidden",
           position: "relative",
-          transition:
-            "border-color 160ms ease-out, transform 200ms ease-out",
+          transition: "transform 200ms ease-out",
           transform: hover ? "translateY(-2px)" : "translateY(0)",
+          containerType: "inline-size",
         }}
       >
-        <DSPreviewCarousel manifest={manifest} hovered={hover} />
+        <DSPreviewCarousel manifest={manifest} hovered={hover} inView={inView} />
 
         {/* Tiny top-left badge — only for forks, subtle */}
         {manifest.parent !== null && (
@@ -199,7 +227,6 @@ export function DSCardSkeleton() {
         style={{
           aspectRatio: "4 / 3",
           background: t.surface,
-          border: `1px solid ${t.border}`,
           borderRadius: swatchRadii.lg,
           animation: "swatchPulse 1200ms ease-in-out infinite",
         }}

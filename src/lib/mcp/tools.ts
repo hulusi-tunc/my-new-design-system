@@ -1,8 +1,6 @@
-import {
-  getAllManifests,
-  getManifestBySlug,
-} from "@/lib/registry";
-import type { DSManifest } from "@/lib/types";
+import { getAllManifests, getManifestBySlug } from "@/lib/registry";
+import type { DSManifest, DSPlatform } from "@/lib/types";
+import { ROLES_BY_PLATFORM } from "@/lib/ingest/roles";
 import {
   fetchCoreFiles,
   fetchComponentFile,
@@ -13,6 +11,7 @@ import {
   resolveComponentFiles,
   needsRoleProvider,
 } from "./dependency-resolver";
+import { getSetupTemplate } from "./setup-templates";
 
 // ── Types ──
 
@@ -22,6 +21,7 @@ export interface RegistrySummary {
   version: string;
   description: string;
   author: string;
+  platform: DSPlatform;
   technology: string[];
   architecture: string;
   componentCount: number;
@@ -32,13 +32,23 @@ export interface RegistrySummary {
 export interface InstallResult {
   designSystem: string;
   slug: string;
+  platform: DSPlatform;
   version: string;
   files: FileEntry[];
   setupInstructions: string[];
   importAliasNote: string;
 }
 
-// ── Helper: summarize a manifest for list/search results ──
+// ── Helpers ──
+
+const PLATFORMS: readonly DSPlatform[] = Object.keys(
+  ROLES_BY_PLATFORM
+) as DSPlatform[];
+
+function normalizePlatform(input: unknown): DSPlatform | undefined {
+  if (typeof input !== "string") return undefined;
+  return PLATFORMS.find((p) => p === input);
+}
 
 function summarize(manifest: DSManifest): RegistrySummary {
   return {
@@ -47,26 +57,32 @@ function summarize(manifest: DSManifest): RegistrySummary {
     version: manifest.version,
     description: manifest.description,
     author: manifest.author.name,
+    platform: manifest.platform,
     technology: manifest.technology,
     architecture: manifest.architecture,
     componentCount: manifest.components.length,
     tags: manifest.tags,
-    // Source is served remotely via GitHub; truly "available" requires a fetch
-    // which we avoid for list views. The install tools check before serving.
-    hasLocalSource: Boolean(manifest.sourceLayout?.components),
+    hasLocalSource: Boolean(manifest.sourceLayout?.componentsDir),
   };
 }
 
 // ── Tool Schemas ──
 
+const PLATFORM_ENUM_DESCRIPTION = `Filter by platform. One of: ${PLATFORMS.join(", ")}.`;
+
 export const TOOL_SCHEMAS = [
   {
     name: "browse_registry",
     description:
-      "List all available design systems in the registry with summary info. Optionally filter by technology or architecture.",
+      "List all available design systems in the registry with summary info. Optionally filter by platform, technology, or architecture.",
     inputSchema: {
       type: "object" as const,
       properties: {
+        platform: {
+          type: "string",
+          enum: PLATFORMS as unknown as string[],
+          description: PLATFORM_ENUM_DESCRIPTION,
+        },
         technology: {
           type: "string",
           description: 'Filter by technology (e.g. "react-19", "tailwind-v4")',
@@ -97,11 +113,16 @@ export const TOOL_SCHEMAS = [
   {
     name: "search_registry",
     description:
-      "Search design systems by name, description, tags, technology, or component names.",
+      "Search design systems by name, description, tags, technology, or component names. Optionally scope to a platform.",
     inputSchema: {
       type: "object" as const,
       properties: {
         query: { type: "string", description: "Search query" },
+        platform: {
+          type: "string",
+          enum: PLATFORMS as unknown as string[],
+          description: PLATFORM_ENUM_DESCRIPTION,
+        },
       },
       required: ["query"],
     },
@@ -124,7 +145,7 @@ export const TOOL_SCHEMAS = [
   {
     name: "install_design_system",
     description:
-      "Install a complete design system into a project. Returns all source files (tokens, providers, components, globals.css) with setup instructions. Claude Code should write these files to the target project.",
+      "Install a complete design system into a project. Returns all source files (tokens, providers, components, globals.css) with platform-appropriate setup instructions. Claude Code should write these files to the target project.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -166,10 +187,16 @@ export const TOOL_SCHEMAS = [
 // ── Tool Handlers ──
 
 export async function browseRegistry(args: {
+  platform?: string;
   technology?: string;
   architecture?: string;
 }): Promise<RegistrySummary[]> {
   let manifests = await getAllManifests();
+
+  const platform = normalizePlatform(args.platform);
+  if (platform) {
+    manifests = manifests.filter((m) => m.platform === platform);
+  }
 
   if (args.technology) {
     const tech = args.technology.toLowerCase();
@@ -198,9 +225,15 @@ export async function getDesignSystem(args: {
 
 export async function searchRegistry(args: {
   query: string;
+  platform?: string;
 }): Promise<RegistrySummary[]> {
   const q = args.query.toLowerCase();
-  const manifests = await getAllManifests();
+  let manifests = await getAllManifests();
+
+  const platform = normalizePlatform(args.platform);
+  if (platform) {
+    manifests = manifests.filter((m) => m.platform === platform);
+  }
 
   const matches = manifests.filter(
     (m) =>
@@ -223,14 +256,6 @@ export async function getTokens(args: { slug: string }): Promise<
   return { designSystem: manifest.name, tokens: manifest.tokens };
 }
 
-const SETUP_INSTRUCTIONS_FULL = [
-  "Install peer dependencies: npm install framer-motion remixicon-react",
-  "Wrap your root layout with <ThemeProvider> (and optionally <RoleProvider>)",
-  "Import globals.css in your root layout",
-  "Ensure tsconfig.json has path alias: { '@/*': ['./src/*'] }",
-  "Tailwind CSS v4 is required with @tailwindcss/postcss plugin",
-];
-
 export async function installDesignSystem(args: {
   slug: string;
 }): Promise<InstallResult | { error: string; repository?: string }> {
@@ -239,7 +264,7 @@ export async function installDesignSystem(args: {
     return { error: `Design system "${args.slug}" not found in registry.` };
   }
 
-  if (!manifest.sourceLayout?.components) {
+  if (!manifest.sourceLayout?.componentsDir) {
     return {
       error: `"${manifest.name}" has no sourceLayout configured. Source files cannot be fetched from the registry.`,
       repository: manifest.repository,
@@ -264,24 +289,37 @@ export async function installDesignSystem(args: {
     };
   }
 
+  const template = getSetupTemplate(manifest.platform);
   return {
     designSystem: manifest.name,
     slug: manifest.slug,
+    platform: manifest.platform,
     version: manifest.version,
     files,
-    setupInstructions: SETUP_INSTRUCTIONS_FULL,
-    importAliasNote:
-      "All files use @/* import aliases. Ensure your project has the same path alias, or adjust imports to match.",
+    setupInstructions: template.full,
+    importAliasNote: template.importAliasNote,
   };
 }
 
-function normalizeFileName(input: string): string {
-  let name = input.toLowerCase().trim();
-  if (!name.includes(".")) {
-    name = name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-    name += ".tsx";
+function normalizeFileName(input: string, platform: DSPlatform): string {
+  const name = input.toLowerCase().trim();
+  if (name.includes(".")) return name;
+  const kebab = name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+  return `${kebab}${defaultExtension(platform)}`;
+}
+
+function defaultExtension(platform: DSPlatform): string {
+  switch (platform) {
+    case "web-react":
+    case "react-native":
+      return ".tsx";
+    case "ios-swiftui":
+      return ".swift";
+    case "android-compose":
+      return ".kt";
+    case "flutter":
+      return ".dart";
   }
-  return name;
 }
 
 export async function installComponent(args: {
@@ -294,13 +332,14 @@ export async function installComponent(args: {
     return { error: `Design system "${args.slug}" not found in registry.` };
   }
 
-  if (!manifest.sourceLayout?.components) {
+  if (!manifest.sourceLayout?.componentsDir) {
     return {
       error: `"${manifest.name}" has no sourceLayout configured. Source files cannot be fetched from the registry.`,
     };
   }
 
-  const fileName = normalizeFileName(args.componentName);
+  const platform = manifest.platform;
+  const fileName = normalizeFileName(args.componentName, platform);
   const componentMeta = manifest.components.find(
     (c) =>
       c.file.toLowerCase() === fileName ||
@@ -314,20 +353,15 @@ export async function installComponent(args: {
   }
 
   const actualFileName = componentMeta.file;
-  const componentFiles = resolveComponentFiles(actualFileName);
+  const componentFiles = resolveComponentFiles(platform, actualFileName);
   const files: FileEntry[] = [];
 
   const includeDeps = args.includeDependencies !== false;
   if (includeDeps) {
     const coreFiles = await fetchCoreFiles(manifest);
-    const needsRole = componentFiles.some((f) => needsRoleProvider(f));
+    const needsRole = componentFiles.some((f) => needsRoleProvider(platform, f));
     for (const core of coreFiles) {
-      if (
-        core.relativePath === "components/providers/role-provider.tsx" &&
-        !needsRole
-      ) {
-        continue;
-      }
+      if (core.role === "roleProvider" && !needsRole) continue;
       files.push(core);
     }
   }
@@ -342,25 +376,19 @@ export async function installComponent(args: {
     if (entry) files.push(entry);
   }
 
+  const template = getSetupTemplate(platform);
   const setupInstructions = includeDeps
-    ? [
-        "Install peer dependencies: npm install framer-motion remixicon-react",
-        "Wrap your root layout with <ThemeProvider>",
-        "Import globals.css in your root layout",
-        "Skip writing any files that already exist in your project",
-      ]
-    : [
-        "This component requires the core design system files (tokens, providers, globals.css) to already be installed.",
-      ];
+    ? template.componentWithDeps
+    : template.componentAlone;
 
   return {
     designSystem: manifest.name,
     slug: manifest.slug,
+    platform,
     version: manifest.version,
     files,
     setupInstructions,
-    importAliasNote:
-      "All files use @/* import aliases. Adjust if your project uses a different alias.",
+    importAliasNote: template.importAliasNote,
   };
 }
 
@@ -380,11 +408,13 @@ export async function callTool(
 ): Promise<unknown> {
   switch (name as ToolName) {
     case "browse_registry":
-      return browseRegistry(args as { technology?: string; architecture?: string });
+      return browseRegistry(
+        args as { platform?: string; technology?: string; architecture?: string }
+      );
     case "get_design_system":
       return getDesignSystem(args as { slug: string });
     case "search_registry":
-      return searchRegistry(args as { query: string });
+      return searchRegistry(args as { query: string; platform?: string });
     case "get_tokens":
       return getTokens(args as { slug: string });
     case "install_design_system":

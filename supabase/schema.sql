@@ -33,6 +33,8 @@ create table if not exists public.design_systems (
   default_branch text default 'main',
 
   -- Metadata
+  platform text not null default 'web-react'
+    check (platform in ('web-react','ios-swiftui','android-compose','flutter','react-native')),
   technology text[] default '{}',
   tags text[] default '{}',
   architecture text,
@@ -51,6 +53,44 @@ create table if not exists public.design_systems (
   updated_at timestamptz default now()
 );
 
+-- ── Ingest jobs (async GitHub → draft manifest pipeline) ──
+
+create table if not exists public.ingest_jobs (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  repo_url text not null,
+  platform text not null
+    check (platform in ('web-react','ios-swiftui','android-compose','flutter','react-native')),
+  branch text,
+  subpath text,
+  status text not null default 'queued'
+    check (status in ('queued','running','done','failed')),
+  progress jsonb,
+  warnings jsonb,
+  error text,
+  draft_manifest jsonb,
+  design_system_id uuid references public.design_systems(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists ingest_jobs_owner_idx on public.ingest_jobs(owner_id);
+create index if not exists ingest_jobs_status_idx on public.ingest_jobs(status);
+
+alter table public.ingest_jobs enable row level security;
+
+drop policy if exists "Users view own ingest jobs" on public.ingest_jobs;
+create policy "Users view own ingest jobs"
+  on public.ingest_jobs for select using (auth.uid() = owner_id);
+
+drop policy if exists "Users insert own ingest jobs" on public.ingest_jobs;
+create policy "Users insert own ingest jobs"
+  on public.ingest_jobs for insert with check (auth.uid() = owner_id);
+
+drop policy if exists "Users update own ingest jobs" on public.ingest_jobs;
+create policy "Users update own ingest jobs"
+  on public.ingest_jobs for update using (auth.uid() = owner_id);
+
 -- ── Stats ──
 
 create table if not exists public.design_system_stats (
@@ -65,6 +105,7 @@ create table if not exists public.design_system_stats (
 
 create index if not exists design_systems_slug_idx on public.design_systems(slug);
 create index if not exists design_systems_owner_idx on public.design_systems(owner_id);
+create index if not exists design_systems_platform_idx on public.design_systems(platform);
 create index if not exists design_systems_published_idx
   on public.design_systems(published) where published = true;
 create index if not exists design_systems_tags_idx
@@ -153,6 +194,11 @@ $$ language plpgsql;
 drop trigger if exists design_systems_updated_at on public.design_systems;
 create trigger design_systems_updated_at
   before update on public.design_systems
+  for each row execute function public.handle_updated_at();
+
+drop trigger if exists ingest_jobs_updated_at on public.ingest_jobs;
+create trigger ingest_jobs_updated_at
+  before update on public.ingest_jobs
   for each row execute function public.handle_updated_at();
 
 -- Auto-create stats row when a design system is created

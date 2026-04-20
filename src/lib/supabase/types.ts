@@ -11,6 +11,18 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+// Supabase JS 2.x expects per-table `Relationships` and public-schema
+// Views/Functions/Enums/CompositeTypes buckets. Missing bits collapse
+// insert/update payloads to `never` at compile time.
+type Relationship = {
+  foreignKeyName: string;
+  columns: string[];
+  isOneToOne?: boolean;
+  referencedRelation: string;
+  referencedColumns: string[];
+};
+type NoRelationships = Relationship[];
+
 export interface Database {
   public: {
     Tables: {
@@ -39,6 +51,7 @@ export interface Database {
           bio?: string | null;
           created_at?: string;
         };
+        Relationships: NoRelationships;
       };
       design_systems: {
         Row: {
@@ -52,6 +65,7 @@ export interface Database {
           manifest_path: string;
           install_path: string | null;
           default_branch: string;
+          platform: string;
           technology: string[];
           tags: string[];
           architecture: string | null;
@@ -73,6 +87,7 @@ export interface Database {
           manifest_path?: string;
           install_path?: string | null;
           default_branch?: string;
+          platform?: string;
           technology?: string[];
           tags?: string[];
           architecture?: string | null;
@@ -94,6 +109,7 @@ export interface Database {
           manifest_path?: string;
           install_path?: string | null;
           default_branch?: string;
+          platform?: string;
           technology?: string[];
           tags?: string[];
           architecture?: string | null;
@@ -104,6 +120,58 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: NoRelationships;
+      };
+      ingest_jobs: {
+        Row: {
+          id: string;
+          owner_id: string;
+          repo_url: string;
+          platform: string;
+          branch: string | null;
+          subpath: string | null;
+          status: string;
+          progress: Json | null;
+          warnings: Json | null;
+          error: string | null;
+          draft_manifest: Json | null;
+          design_system_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          repo_url: string;
+          platform: string;
+          branch?: string | null;
+          subpath?: string | null;
+          status?: string;
+          progress?: Json | null;
+          warnings?: Json | null;
+          error?: string | null;
+          draft_manifest?: Json | null;
+          design_system_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          repo_url?: string;
+          platform?: string;
+          branch?: string | null;
+          subpath?: string | null;
+          status?: string;
+          progress?: Json | null;
+          warnings?: Json | null;
+          error?: string | null;
+          draft_manifest?: Json | null;
+          design_system_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: NoRelationships;
       };
       design_system_stats: {
         Row: {
@@ -127,7 +195,12 @@ export interface Database {
           stars?: number;
           updated_at?: string;
         };
+        Relationships: NoRelationships;
       };
     };
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
 }

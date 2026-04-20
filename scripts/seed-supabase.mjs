@@ -56,6 +56,25 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
+// ── Detect whether the `platform` column has been added yet ──
+// If not, we skip writing it in the row payload. The JSONB manifest
+// already carries the platform value, so queries can still filter on it.
+
+async function detectPlatformColumn() {
+  const { error } = await supabase
+    .from("design_systems")
+    .select("platform")
+    .limit(1);
+  return !error;
+}
+
+const PLATFORM_COLUMN_EXISTS = await detectPlatformColumn();
+if (!PLATFORM_COLUMN_EXISTS) {
+  console.log(
+    "ℹ platform column not found — skipping column write. Run the ALTER TABLE in supabase/schema.sql to enable it."
+  );
+}
+
 // ── Read all manifests from design-systems/ ──
 
 async function readAllManifests() {
@@ -98,6 +117,12 @@ async function upsertManifest(manifest) {
     manifest: manifest,
     published: true,
   };
+
+  // If the `platform` column has been migrated in, populate it. Otherwise
+  // the JSONB manifest still carries the platform and queries filter on that.
+  if (PLATFORM_COLUMN_EXISTS) {
+    row.platform = manifest.platform ?? "web-react";
+  }
 
   const { data, error } = await supabase
     .from("design_systems")

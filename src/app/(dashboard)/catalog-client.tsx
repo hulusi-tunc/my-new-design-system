@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, type CSSProperties } from "react";
-import Link from "next/link";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { DSCard } from "@/components/registry/ds-card";
+import { PrimaryPill } from "@/components/editorial";
+import { getCategoryMeta, type PlatformCategory } from "@/lib/platforms";
 import type { DSManifest } from "@/lib/types";
 
 // Remix icons
@@ -52,11 +53,16 @@ const FILTER_GROUPS: FilterGroup[] = [
 
 /* ─────────────────────────────────────── Catalog ─────────────────────────────────────── */
 
-export function CatalogClient({ systems }: { systems: SystemEntry[] }) {
+interface CatalogClientProps {
+  category: PlatformCategory;
+  systems: SystemEntry[];
+}
+
+export function CatalogClient({ category, systems }: CatalogClientProps) {
   const { theme } = useTheme();
   const t = getNd(theme);
+  const categoryMeta = getCategoryMeta(category);
   const [filter, setFilter] = useState<Filter>("all");
-  const [submitHover, setSubmitHover] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -179,35 +185,19 @@ export function CatalogClient({ systems }: { systems: SystemEntry[] }) {
   const filterButtonStyle: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: 8,
-    background: filterPanelOpen ? t.surfaceRaised : t.surface,
-    border: `1px solid ${filterPanelOpen ? t.borderVisible : t.border}`,
-    borderRadius: swatchRadii.md,
-    padding: "7px 12px",
+    gap: 10,
+    background: filterPanelOpen ? t.surfaceRaised : "transparent",
+    border: `1px solid ${filterPanelOpen ? t.textDisplay : t.borderVisible}`,
+    borderRadius: 9999,
+    padding: "10px 18px",
     fontFamily: editorialFonts.body,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 500,
-    lineHeight: 1.2,
-    color: t.textPrimary,
+    lineHeight: 1,
+    color: t.textDisplay,
     cursor: "pointer",
-    transition: "background 120ms ease-out, border-color 120ms ease-out",
-  };
-
-  const submitButtonStyle: CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    background: submitHover ? t.accentHover : t.accent,
-    color: t.accentFg,
-    fontFamily: editorialFonts.body,
-    fontSize: 13,
-    fontWeight: 500,
-    lineHeight: 1.2,
-    padding: "7px 14px",
-    borderRadius: swatchRadii.md,
-    textDecoration: "none",
-    transition: "background-color 120ms ease-out",
+    transition:
+      "background 200ms cubic-bezier(0.165, 0.84, 0.44, 1), border-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
   };
 
   /* ── render ──────────────────────────── */
@@ -282,15 +272,10 @@ export function CatalogClient({ systems }: { systems: SystemEntry[] }) {
             )}
           </button>
 
-          <Link
-            href="/submit"
-            onMouseEnter={() => setSubmitHover(true)}
-            onMouseLeave={() => setSubmitHover(false)}
-            style={submitButtonStyle}
-          >
-            <AddLineIcon size={14} color={t.accentFg} />
+          <PrimaryPill href="/submit" trailingArrow={false}>
+            <AddLineIcon size={14} />
             Submit system
-          </Link>
+          </PrimaryPill>
         </div>
 
         {/* Filter panel */}
@@ -365,17 +350,16 @@ export function CatalogClient({ systems }: { systems: SystemEntry[] }) {
       {/* Grid */}
       <section style={{ padding: "4px 32px 48px" }}>
         {filtered.length === 0 ? (
-          <div
-            style={{
-              padding: "60px 0",
-              textAlign: "center",
-              fontFamily: editorialFonts.body,
-              fontSize: 14,
-              color: t.textSecondary,
+          <EmptyState
+            platformLabel={categoryMeta.label}
+            hasAnySystems={systems.length > 0}
+            hasActiveFilters={activeCount > 0 || filter !== "all"}
+            onClearFilters={() => {
+              setFilter("all");
+              clearAll();
             }}
-          >
-            No systems match your filters
-          </div>
+            t={t}
+          />
         ) : (
           <div
             className="swatch-catalog-grid"
@@ -553,6 +537,112 @@ function FilterPanel({
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  platformLabel,
+  hasAnySystems,
+  hasActiveFilters,
+  onClearFilters,
+  t,
+}: {
+  platformLabel: string;
+  hasAnySystems: boolean;
+  hasActiveFilters: boolean;
+  onClearFilters: () => void;
+  t: ReturnType<typeof getNd>;
+}) {
+  // Two shapes: (1) platform has zero systems — invite submission,
+  // (2) filters exclude everything — invite clearing.
+  if (hasAnySystems && hasActiveFilters) {
+    return (
+      <div
+        style={{
+          padding: "60px 0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          fontFamily: editorialFonts.body,
+          color: t.textSecondary,
+        }}
+      >
+        <span style={{ fontSize: 14 }}>No systems match your filters</span>
+        <button
+          type="button"
+          onClick={onClearFilters}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: t.textDisplay,
+            fontFamily: editorialFonts.body,
+            fontSize: 13,
+            textDecoration: "underline",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          Clear filters
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        padding: "80px 24px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+        fontFamily: editorialFonts.body,
+        textAlign: "center",
+        color: t.textSecondary,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: editorialFonts.mono,
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: t.textDisabled,
+        }}
+      >
+        {platformLabel}
+      </span>
+      <h2
+        style={{
+          margin: 0,
+          fontFamily: editorialFonts.display,
+          fontSize: 26,
+          fontWeight: 500,
+          lineHeight: 1.15,
+          color: t.textDisplay,
+          maxWidth: 520,
+        }}
+      >
+        No design systems for this platform yet
+      </h2>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 14,
+          lineHeight: 1.55,
+          maxWidth: 440,
+        }}
+      >
+        Be the first to publish one — fork an existing system or submit a repo
+        and we&apos;ll extract the tokens and components for you.
+      </p>
+      <div style={{ display: "inline-flex", gap: 10, marginTop: 6 }}>
+        <PrimaryPill href="/submit" trailingArrow={false}>
+          Submit a system
+        </PrimaryPill>
       </div>
     </div>
   );

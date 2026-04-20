@@ -1,13 +1,14 @@
-import { getAllManifests, getForks } from "@/lib/registry";
-import { CatalogClient } from "../catalog-client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import {
+  CATEGORY_COOKIE,
+  DEFAULT_CATEGORY,
+  isValidCategory,
+} from "@/lib/platforms";
 
-export default async function CatalogPage() {
-  const allManifests = await getAllManifests();
-
-  const systemsWithForkCount = allManifests.map((m) => ({
-    manifest: m,
-    forkCount: getForks(allManifests, m.slug).length,
-  }));
-
-  return <CatalogClient systems={systemsWithForkCount} />;
+export default async function CatalogIndexPage() {
+  const cookieStore = await cookies();
+  const saved = cookieStore.get(CATEGORY_COOKIE)?.value;
+  const category = saved && isValidCategory(saved) ? saved : DEFAULT_CATEGORY;
+  redirect(`/catalog/${category}`);
 }

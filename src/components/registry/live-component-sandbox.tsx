@@ -886,9 +886,15 @@ export function LiveComponentSandbox({
     let cancelled = false;
     setState({ status: "loading" });
 
-    // Fetch the primary component plus (if set) every cycle component, with
-    // the primary first so the required-file check below hits a stable path.
-    const targetComponents = [component, ...(cycleComponents ?? [])];
+    // Fetch the primary component plus the entire component sibling set,
+    // because any sibling could be imported transitively (e.g. CopyCommand
+    // → Typography). We don't statically know each DS's dep graph and this
+    // is one cached GitHub round-trip for everything.
+    const targetComponents = [
+      component,
+      ...(cycleComponents ?? []),
+      ...(manifest.components ?? []),
+    ];
     // De-dupe by file so we don't fetch the same file twice.
     const seen = new Set<string>();
     const uniqueTargets = targetComponents.filter((c) => {

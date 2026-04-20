@@ -80,7 +80,7 @@ function resolveOverviewColors(colors: DSTokenColors): {
   neutral: ColorGroup | null;
 } {
   const exclude = new Set<string>();
-  const primary = pickColorGroup(colors, "Primary", ["brand", "primary", "blue", "cyan", "teal", "indigo"], exclude);
+  const primary = pickColorGroup(colors, "Primary", ["brand", "primary", "blue", "cyan", "teal", "indigo", "accent"], exclude);
   const secondary = pickColorGroup(
     colors,
     "Secondary",
@@ -99,6 +99,30 @@ function resolveOverviewColors(colors: DSTokenColors): {
     ["neutral", "gray", "grey", "slate", "zinc", "stone"],
     exclude
   );
+
+  // Flat-color fallback: if NO groups matched but the manifest has flat
+  // string colors (auto-extracted manifests), synthesize a single neutral
+  // group from them so something renders instead of empty swatches.
+  if (!primary && !secondary && !tertiary && !neutral) {
+    const flatShades = Object.values(colors)
+      .filter(isRenderableColor)
+      .slice(0, 12);
+    if (flatShades.length >= 2) {
+      const accentLike = (Object.entries(colors).find(
+        ([k]) => /(accent|brand|primary|interactive)/i.test(k)
+      )?.[1] ?? null) as string | null;
+      const mid = flatShades[Math.floor(flatShades.length / 2)];
+      return {
+        primary: accentLike && isRenderableColor(accentLike)
+          ? { name: "Accent", mainHex: accentLike, shades: [accentLike] }
+          : null,
+        secondary: null,
+        tertiary: null,
+        neutral: { name: "Palette", mainHex: mid, shades: flatShades },
+      };
+    }
+  }
+
   return { primary, secondary, tertiary, neutral };
 }
 
@@ -344,85 +368,108 @@ function TypographySlide({ manifest, brand, dsFont, ds }: SlideProps) {
   );
 }
 
-function ButtonsSlide({ brand, dsFont, ds }: SlideProps) {
-  const btnFont = "clamp(12px, 3.2cqw, 18px)";
-  const btnPadY = "clamp(8px, 2.2cqw, 14px)";
-  const btnPadX = "clamp(14px, 4.5cqw, 26px)";
-  const smFont = "clamp(11px, 2.8cqw, 16px)";
-  const smPadY = "clamp(6px, 1.8cqw, 11px)";
-  const smPadX = "clamp(10px, 3.5cqw, 20px)";
+/**
+ * Real Button slide — renders the DS's actual Button component via Sandpack
+ * using whatever examples the manifest declares, so what you see matches the
+ * real component's appearance, not a CSS approximation.
+ *
+ * If the DS has no Button component we render nothing (the carousel skips
+ * the slide) so we never show fake buttons alongside real ones.
+ */
+function ButtonsSlide({ manifest, ds, t, hovered, inView }: SlideProps) {
+  const buttonComponent = useMemo(() => {
+    const normalise = (name: string) => name.toLowerCase().replace(/[\s_-]/g, "");
+    return (
+      manifest.components.find((c) => /^button$/.test(normalise(c.name))) ??
+      manifest.components.find((c) => /button/.test(normalise(c.name))) ??
+      null
+    );
+  }, [manifest.components]);
+
+  if (!buttonComponent) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "5cqw",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: editorialFonts.mono,
+            fontSize: "clamp(10px, 2.4cqw, 13px)",
+            color: t.textDisabled,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+        >
+          No button component
+        </span>
+      </div>
+    );
+  }
+
+  // Cap at 4 examples so the slide doesn't get crowded in the small card.
+  const examples = buttonComponent.examples?.slice(0, 4);
 
   return (
     <div
       style={{
         width: "100%",
         height: "100%",
+        padding: "3cqw 4cqw 4cqw",
         display: "flex",
-        flexDirection: "column",
+        alignItems: "stretch",
         justifyContent: "center",
-        alignItems: "center",
-        gap: "3.5cqw",
-        padding: "8cqw",
       }}
     >
-      <div style={{ display: "flex", gap: "2.5cqw", flexWrap: "wrap", justifyContent: "center" }}>
-        <span
-          style={{
-            padding: `${btnPadY} ${btnPadX}`,
-            fontSize: btnFont,
-            fontWeight: Number(ds.weightMedium),
-            fontFamily: dsFont,
-            color: ds.textOnBrand,
-            background: brand,
-            borderRadius: ds.radiusMd,
-            border: "none",
-          }}
-        >
-          Primary
-        </span>
-        <span
-          style={{
-            padding: `${btnPadY} ${btnPadX}`,
-            fontSize: btnFont,
-            fontWeight: Number(ds.weightMedium),
-            fontFamily: dsFont,
-            color: brand,
-            background: "transparent",
-            border: `1.5px solid ${brand}`,
-            borderRadius: ds.radiusMd,
-          }}
-        >
-          Secondary
-        </span>
-      </div>
-      <div style={{ display: "flex", gap: "2.5cqw", flexWrap: "wrap", justifyContent: "center" }}>
-        <span
-          style={{
-            padding: `${smPadY} ${smPadX}`,
-            fontSize: smFont,
-            fontWeight: Number(ds.weightMedium),
-            fontFamily: dsFont,
-            color: ds.textPrimary,
-            background: ds.surface,
-            borderRadius: ds.radiusSm,
-            border: `1px solid ${ds.border}`,
-          }}
-        >
-          Ghost
-        </span>
-        <span
-          style={{
-            padding: `${smPadY} ${smPadX}`,
-            fontSize: smFont,
-            fontWeight: Number(ds.weightMedium),
-            fontFamily: dsFont,
-            color: ds.textDisabled,
-            borderRadius: ds.radiusSm,
-            border: `1px dashed ${ds.border}`,
-          }}
-        >
-          Disabled
-        </span>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "clamp(10px, 2.4cqw, 16px)",
+          overflow: "hidden",
+        }}
+      >
+        {inView ? (
+          <LiveComponentSandbox
+            manifest={manifest}
+            component={buttonComponent}
+            examples={examples}
+            mode={examples && examples.length > 1 ? "gallery" : "single"}
+            cyclingEnabled={hovered}
+            height="100%"
+            bare
+            transparentBg
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: ds.surfaceInk,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: editorialFonts.mono,
+                fontSize: "clamp(9px, 2.2cqw, 12px)",
+                color: t.textDisabled,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              Loads in view
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -629,7 +676,7 @@ function pickCycleComponents(manifest: DSManifest, max = 5): DSComponent[] {
   return out;
 }
 
-function ComponentsSlide({ manifest, ds, t, inView }: SlideProps) {
+function ComponentsSlide({ manifest, ds, t, hovered, inView }: SlideProps) {
   const count = manifest.components.length;
   const previewComponent = useMemo(
     () => pickLivePreviewComponent(manifest),
@@ -745,7 +792,7 @@ function ComponentsSlide({ manifest, ds, t, inView }: SlideProps) {
  * was visually generic because each cell communicated a weak signal. A DS's
  * identity is its font + brand + component feel, not a list of tokens.
  */
-function OverviewSlide({ manifest, brand, dsFont, ds, t, inView }: SlideProps) {
+function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered, inView }: SlideProps) {
   const fontName =
     manifest.tokens.typography?.fontFamily?.split(",")[0]?.replace(/['"]/g, "").trim() ||
     "System";
@@ -883,7 +930,10 @@ function OverviewSlide({ manifest, brand, dsFont, ds, t, inView }: SlideProps) {
       {/* ── 3. Component band ───────────────────────────
           The DS's real Button component, rendered by Sandpack from its
           actual source on GitHub — no CSS approximation. Mounts only once
-          the card enters the viewport so off-screen cards stay cheap. */}
+          the card enters the viewport so off-screen cards stay cheap.
+          Sits on a transparent background so the card surface shows through
+          instead of a solid white slab, with inset padding so the preview
+          doesn't run edge-to-edge. */}
       <div
         style={{
           position: "relative",
@@ -892,16 +942,28 @@ function OverviewSlide({ manifest, brand, dsFont, ds, t, inView }: SlideProps) {
           justifyContent: "center",
           overflow: "hidden",
           minHeight: 0,
+          padding: "3cqw 4cqw 4cqw",
         }}
       >
         {inView && previewComponent ? (
-          <LiveComponentSandbox
-            manifest={manifest}
-            component={previewComponent}
-            cycleComponents={cycleComponents}
-            height="100%"
-            bare
-          />
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "clamp(10px, 2.4cqw, 16px)",
+              overflow: "hidden",
+            }}
+          >
+            <LiveComponentSandbox
+              manifest={manifest}
+              component={previewComponent}
+              cycleComponents={cycleComponents}
+              cyclingEnabled={hovered}
+              height="100%"
+              bare
+              transparentBg
+            />
+          </div>
         ) : (
           <span
             style={{

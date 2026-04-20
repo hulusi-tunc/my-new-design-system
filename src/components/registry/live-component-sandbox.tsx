@@ -146,8 +146,47 @@ function defaultExampleCode(name: string): string {
   if (/codeblock/.test(n)) {
     return `<${Comp}>{\`npm install @hubera/core\`}</${Comp}>`;
   }
-  // Generic fallback: self-closing tag
-  return `<${Comp} />`;
+  if (/copycommand/.test(n)) {
+    return `<${Comp} cmd="npx supabase db push" />`;
+  }
+  if (/select/.test(n)) {
+    return `<${Comp} label="Theme" options={[{label:"Light",value:"l"},{label:"Dark",value:"d"}]} />`;
+  }
+  if (/tooltip/.test(n)) {
+    return `<${Comp} label="Click to copy"><span style={{padding:"6px 10px",border:"1px solid #ccc",borderRadius:6}}>Hover</span></${Comp}>`;
+  }
+  if (/avatar/.test(n)) {
+    return `<${Comp} name="Hulusi" />`;
+  }
+  if (/skeleton/.test(n)) {
+    return `<${Comp} width={200} height={20} />`;
+  }
+  if (/field/.test(n)) {
+    return `<${Comp} label="Email" hint="We won't share it"><input style={{padding:"8px 10px",border:"1px solid #ccc",borderRadius:6,width:200}} /></${Comp}>`;
+  }
+  if (/navlink/.test(n)) {
+    return `<${Comp} href="#" label="Catalog" />`;
+  }
+  if (/popover/.test(n)) {
+    return `<${Comp} trigger={<button style={{padding:"6px 10px"}}>Open</button>}>Popover content</${Comp}>`;
+  }
+  if (/modal/.test(n)) {
+    return `<${Comp} open onOpenChange={() => {}}>Modal body</${Comp}>`;
+  }
+  if (/emptystate/.test(n) || /empty/.test(n)) {
+    return `<${Comp} title="Nothing here yet" description="Get started by adding your first item." />`;
+  }
+  if (/stat/.test(n)) {
+    return `<${Comp} label="Components" value={13} />`;
+  }
+  if (/^stack$|^row$|^container$|^divider$/.test(n)) {
+    return `<${Comp}><div style={{padding:8,background:"#eee"}}>One</div><div style={{padding:8,background:"#ddd"}}>Two</div></${Comp}>`;
+  }
+  if (/^text$|^display$|^body$|^label$|^mono$/.test(n) || /typography/.test(n)) {
+    return `<${Comp}>The quick brown fox jumps over the lazy dog</${Comp}>`;
+  }
+  // Generic fallback: try children with the component name
+  return `<${Comp}>${name}</${Comp}>`;
 }
 
 function toPascalCase(name: string): string {

@@ -18,9 +18,9 @@ export interface ColorPalettePreviewProps {
 
 // ── Helpers ────────────────────────────────────────
 
-/** Check if a string is a renderable color (hex, rgb, hsl — not a var() reference) */
+/** Check if a string is a renderable color (hex, rgb, hsl, oklch — not a var() reference) */
 function isRenderableColor(value: string): boolean {
-  return /^#|^rgb|^hsl/.test(value.trim());
+  return /^(?:#|rgb|hsl|oklch|color\()/i.test(value.trim());
 }
 
 /** Pick representative colors for the strip (one per scale, mid-range shade) */

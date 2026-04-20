@@ -45,6 +45,8 @@ interface ButtonAsLink extends BaseButtonProps {
   disabled?: boolean;
   "aria-label"?: string;
   children?: ReactNode;
+  style?: CSSProperties;
+  className?: string;
 }
 
 type ButtonProps = ButtonAsButton | ButtonAsLink;
@@ -148,16 +150,18 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     );
 
     if ("href" in props && props.href) {
+      const linkProps = props as ButtonAsLink;
       return (
         <Link
           ref={ref as React.Ref<HTMLAnchorElement>}
-          href={props.href}
-          target={props.target}
-          rel={props.rel}
-          onClick={props.onClick}
-          aria-label={props["aria-label"]}
+          href={linkProps.href}
+          target={linkProps.target}
+          rel={linkProps.rel}
+          onClick={linkProps.onClick}
+          aria-label={linkProps["aria-label"]}
           aria-disabled={isDisabled(props) || loading || undefined}
-          style={style}
+          className={linkProps.className}
+          style={{ ...style, ...linkProps.style }}
           {...hoverHandlers}
         >
           {content}

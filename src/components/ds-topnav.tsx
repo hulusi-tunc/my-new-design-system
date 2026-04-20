@@ -4,7 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { useTheme } from "@/components/providers/theme-provider";
-import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
+import {
+  getNd,
+  editorialFonts,
+  swatchRadii,
+  space,
+} from "@/lib/nothing-tokens";
 import { HuberaLogo } from "@/components/brand/hubera-logo";
 import { createClient } from "@/lib/supabase/client";
 import { isAdminEmail } from "@/lib/auth/admin";
@@ -12,8 +17,14 @@ import type { User } from "@supabase/supabase-js";
 import { DesignSystemsNav } from "@/components/design-systems-nav";
 import { useCurrentCategory } from "@/lib/use-current-category";
 import { getCategoryMeta } from "@/lib/platforms";
+import {
+  Avatar,
+  Button,
+  IconButton,
+  NavLink,
+  Row,
+} from "@/components/hub";
 
-// Remix icons — established project icon library
 import SearchLineIcon from "remixicon-react/SearchLineIcon";
 import BookmarkLineIcon from "remixicon-react/BookmarkLineIcon";
 import Notification3LineIcon from "remixicon-react/Notification3LineIcon";
@@ -22,96 +33,6 @@ import MoonLineIcon from "remixicon-react/MoonLineIcon";
 
 export const TOPNAV_HEIGHT = 60;
 
-
-/* ─────────────────────────────────────── Nav link ─────────────────────────────────────── */
-
-function NavLink({
-  href,
-  label,
-  active,
-  color,
-  hoverColor,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-  color: string;
-  hoverColor: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-
-  const style: CSSProperties = {
-    fontFamily: editorialFonts.body,
-    fontSize: 14,
-    fontWeight: active ? 600 : 500,
-    color: active ? hoverColor : hovered ? hoverColor : color,
-    textDecoration: "none",
-    padding: "6px 2px",
-    transition: "color 120ms ease-out",
-  };
-
-  return (
-    <Link
-      href={href}
-      style={style}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {label}
-    </Link>
-  );
-}
-
-/* ─────────────────────────────────────── Icon button ──────────────────────────────────── */
-
-function IconButton({
-  onClick,
-  children,
-  color,
-  hoverColor,
-  hoverBg,
-  ariaLabel,
-}: {
-  onClick?: () => void;
-  children: React.ReactNode;
-  color: string;
-  hoverColor: string;
-  hoverBg: string;
-  ariaLabel: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-
-  const style: CSSProperties = {
-    width: 34,
-    height: 34,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: swatchRadii.md,
-    border: "none",
-    background: hovered ? hoverBg : "transparent",
-    color: hovered ? hoverColor : color,
-    cursor: "pointer",
-    transition: "background 120ms ease-out, color 120ms ease-out",
-    padding: 0,
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={style}
-      aria-label={ariaLabel}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-/* ─────────────────────────────────────── Top nav ──────────────────────────────────────── */
-
 export function DSTopNav() {
   const { theme, toggle } = useTheme();
   const t = getNd(theme);
@@ -119,7 +40,6 @@ export function DSTopNav() {
   const currentCategory = useCurrentCategory();
   const categoryMeta = getCategoryMeta(currentCategory);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [avatarHovered, setAvatarHovered] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -152,7 +72,6 @@ export function DSTopNav() {
     user?.email?.split("@")[0] ??
     "";
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
-  const avatarInitial = githubUsername.charAt(0).toUpperCase() || "?";
 
   const isActive = (href: string) => {
     if (href === "/catalog") {
@@ -160,8 +79,6 @@ export function DSTopNav() {
     }
     return pathname === href || pathname.startsWith(href + "/");
   };
-
-  /* ── styles ──────────────────────────── */
 
   const navStyle: CSSProperties = {
     position: "fixed",
@@ -173,29 +90,9 @@ export function DSTopNav() {
     display: "flex",
     alignItems: "center",
     gap: 28,
-    padding: "0 24px",
+    padding: `0 ${space[6]}px`,
     zIndex: 50,
     fontFamily: editorialFonts.body,
-  };
-
-  const leftStyle: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 24,
-    flexShrink: 0,
-  };
-
-  const logoLinkStyle: CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    textDecoration: "none",
-  };
-
-  const centerStyle: CSSProperties = {
-    flex: 1,
-    display: "flex",
-    justifyContent: "center",
-    minWidth: 0,
   };
 
   const searchStyle: CSSProperties = {
@@ -209,59 +106,23 @@ export function DSTopNav() {
     alignItems: "center",
     padding: "0 16px",
     gap: 10,
-    transition: "border-color 120ms ease-out, background 120ms ease-out",
-  };
-
-  const searchInputStyle: CSSProperties = {
-    flex: 1,
-    border: "none",
-    outline: "none",
-    background: "transparent",
-    color: t.textPrimary,
-    fontFamily: editorialFonts.body,
-    fontSize: 13,
-    minWidth: 0,
-  };
-
-  const rightStyle: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 0,
-  };
-
-  const avatarStyle: CSSProperties = {
-    width: 32,
-    height: 32,
-    borderRadius: swatchRadii.full,
-    background: t.accent,
-    color: t.accentFg,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 13,
-    fontWeight: 600,
-    fontFamily: editorialFonts.body,
-    border: `1px solid ${avatarHovered ? t.accentHover : "transparent"}`,
-    cursor: "pointer",
-    marginLeft: 8,
-    transition: "border-color 120ms ease-out",
+    transition: "background 120ms ease-out",
   };
 
   return (
     <nav style={navStyle}>
       {/* ── Left: logo + nav links ───────── */}
-      <div style={leftStyle}>
+      <Row gap={6} align="center" style={{ flexShrink: 0 }}>
         <Link
           href="/catalog"
+          aria-label="Hubera home"
           style={{
-            ...logoLinkStyle,
-            color: t.textDisplay,
             display: "inline-flex",
             alignItems: "center",
             gap: 10,
+            color: t.textDisplay,
+            textDecoration: "none",
           }}
-          aria-label="Hubera home"
         >
           <HuberaLogo variant="mark" height={22} />
           <span
@@ -277,33 +138,25 @@ export function DSTopNav() {
           </span>
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <Row gap={5} align="center">
           <DesignSystemsNav
             label="Design Systems"
             variant="topnav"
             active={isActive("/catalog")}
           />
-          <NavLink
-            href="/skills"
-            label="Skills"
-            active={isActive("/skills")}
-            color={t.textSecondary}
-            hoverColor={t.textDisplay}
-          />
-          {isAdminEmail(user?.email) ? (
-            <NavLink
-              href="/admin"
-              label="Admin"
-              active={isActive("/admin")}
-              color={t.textSecondary}
-              hoverColor={t.textDisplay}
-            />
-          ) : null}
-        </div>
-      </div>
+          <NavLink href="/skills" active={isActive("/skills")}>
+            Skills
+          </NavLink>
+          {isAdminEmail(user?.email) && (
+            <NavLink href="/admin" active={isActive("/admin")}>
+              Admin
+            </NavLink>
+          )}
+        </Row>
+      </Row>
 
       {/* ── Center: search pill ──────────── */}
-      <div style={centerStyle}>
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
         <div style={searchStyle}>
           <span style={{ color: t.textSecondary, display: "inline-flex" }}>
             <SearchLineIcon size={16} />
@@ -313,7 +166,16 @@ export function DSTopNav() {
             placeholder={`Search ${categoryMeta.searchLabel} design systems…`}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            style={searchInputStyle}
+            style={{
+              flex: 1,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: t.textPrimary,
+              fontFamily: editorialFonts.body,
+              fontSize: 13,
+              minWidth: 0,
+            }}
             aria-label={`Search ${categoryMeta.label} design systems`}
           />
           <span
@@ -331,82 +193,44 @@ export function DSTopNav() {
         </div>
       </div>
 
-      {/* ── Right: icons + avatar ───────── */}
-      <div style={rightStyle}>
-        <IconButton
-          color={t.textSecondary}
-          hoverColor={t.textDisplay}
-          hoverBg={t.surface}
-          ariaLabel="Bookmarks"
-        >
+      {/* ── Right: icons + auth ─────────── */}
+      <Row gap={1} align="center" style={{ flexShrink: 0 }}>
+        <IconButton variant="ghost" size="md" aria-label="Bookmarks">
           <BookmarkLineIcon size={18} />
         </IconButton>
-        <IconButton
-          color={t.textSecondary}
-          hoverColor={t.textDisplay}
-          hoverBg={t.surface}
-          ariaLabel="Notifications"
-        >
+        <IconButton variant="ghost" size="md" aria-label="Notifications">
           <Notification3LineIcon size={18} />
         </IconButton>
         <IconButton
+          variant="ghost"
+          size="md"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           onClick={toggle}
-          color={t.textSecondary}
-          hoverColor={t.textDisplay}
-          hoverBg={t.surface}
-          ariaLabel={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
           {theme === "dark" ? <SunLineIcon size={18} /> : <MoonLineIcon size={18} />}
         </IconButton>
 
         {authReady && !user && (
-          <Link
+          <Button
+            variant="secondary"
+            size="sm"
             href="/login"
-            style={{
-              fontFamily: editorialFonts.body,
-              fontSize: 13,
-              fontWeight: 500,
-              color: t.textSecondary,
-              textDecoration: "none",
-              padding: "8px 14px",
-              marginLeft: 8,
-              borderRadius: swatchRadii.full,
-              border: `1px solid ${t.border}`,
-              transition: "color 120ms ease-out, border-color 120ms ease-out",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = t.textDisplay;
-              e.currentTarget.style.borderColor = t.borderStrong;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = t.textSecondary;
-              e.currentTarget.style.borderColor = t.border;
-            }}
+            style={{ marginLeft: 8 }}
           >
             Sign in
-          </Link>
+          </Button>
         )}
 
         {user && (
-          <Link
+          <Avatar
+            src={avatarUrl}
+            label={githubUsername || "Account"}
+            size="md"
             href="/dashboard"
-            style={{
-              ...avatarStyle,
-              textDecoration: "none",
-              overflow: "hidden",
-              backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-            onMouseEnter={() => setAvatarHovered(true)}
-            onMouseLeave={() => setAvatarHovered(false)}
-            aria-label={`Account: ${githubUsername}`}
-            title={githubUsername}
-          >
-            {!avatarUrl && avatarInitial}
-          </Link>
+            style={{ marginLeft: 8 }}
+          />
         )}
-      </div>
+      </Row>
     </nav>
   );
 }

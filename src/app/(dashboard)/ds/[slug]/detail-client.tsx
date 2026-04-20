@@ -7,12 +7,11 @@ import { getNd, editorialFonts } from "@/lib/nothing-tokens";
 import { resolveDsTokens } from "@/lib/resolve-ds-tokens";
 import { ComponentExplorer } from "@/components/registry/component-explorer";
 import { MobileComponentViewer } from "@/components/registry/mobile-component-viewer";
-import { InstallPanel } from "@/components/registry/install-panel";
 import { RelatedSystems } from "@/components/registry/family-tree";
 import { getCategoryForPlatform } from "@/lib/platforms";
 import type { DSManifest } from "@/lib/types";
 
-type Tab = "components" | "install" | "forks";
+type Tab = "components" | "forks";
 
 export function DetailClient({
   manifest,
@@ -36,7 +35,6 @@ export function DetailClient({
       id: "components",
       label: `COMPONENTS (${String(manifest.components.length).padStart(2, "0")})`,
     },
-    { id: "install", label: "INSTALL" },
     {
       id: "forks",
       label: `FORKS (${String(forks.length).padStart(2, "0")})`,
@@ -103,8 +101,6 @@ export function DetailClient({
             ) : (
               <MobileComponentViewer manifest={manifest} />
             ))}
-
-          {activeTab === "install" && <InstallPanel manifest={manifest} />}
 
           {activeTab === "forks" && (
             <ForksTab forks={forks} allManifests={allManifests} manifest={manifest} t={t} />
@@ -186,20 +182,15 @@ function DSHero({
     margin: 0,
   };
 
-  const emDashStyle: CSSProperties = {
-    color: t.textDisabled,
-    fontWeight: 400,
-    marginLeft: 8,
-  };
-
   const taglineStyle: CSSProperties = {
-    display: "block",
     fontFamily: editorialFonts.body,
-    fontSize: "clamp(32px, 4.4vw, 52px)",
+    fontSize: 18,
     fontWeight: 400,
-    lineHeight: 1.05,
-    letterSpacing: "-0.025em",
-    color: t.textPrimary,
+    lineHeight: 1.5,
+    letterSpacing: "-0.005em",
+    color: t.textSecondary,
+    margin: 0,
+    maxWidth: "60ch",
   };
 
   const metaRowStyle: CSSProperties = {
@@ -284,12 +275,6 @@ function DSHero({
     transition: "background 120ms ease-out",
   };
 
-  /* ── Derive a short tagline from description ── */
-  const tagline =
-    manifest.description.length > 60
-      ? manifest.description.slice(0, 57).trimEnd() + "…"
-      : manifest.description;
-
   /* ── Render ──────────────────────────────────── */
 
   return (
@@ -317,12 +302,11 @@ function DSHero({
           </Link>
         )}
 
-        {/* Title — name — on line 1, tagline on line 2 */}
-        <h1 style={titleStyle}>
-          {manifest.name}
-          <span style={emDashStyle}>—</span>
-          <span style={taglineStyle}>{tagline}</span>
-        </h1>
+        {/* Title + description */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <h1 style={titleStyle}>{manifest.name}</h1>
+          <p style={taglineStyle}>{manifest.description}</p>
+        </div>
 
         {/* Meta row: Platform / Version / Category */}
         <div style={metaRowStyle}>

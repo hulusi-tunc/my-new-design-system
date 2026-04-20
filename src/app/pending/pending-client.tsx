@@ -3,6 +3,7 @@
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
 import { Eyebrow, GhostArrowLink } from "@/components/editorial";
+import { Button } from "@/components/hub";
 import { HeroShader } from "@/components/hero-shader";
 import { HuberaLogo } from "@/components/brand/hubera-logo";
 import Link from "next/link";
@@ -156,25 +157,9 @@ export function PendingClient({
 
           {/* Sign out */}
           <form action="/auth/signout" method="POST">
-            <button
-              type="submit"
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                fontFamily: editorialFonts.mono,
-                fontSize: 11,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: t.textSecondary,
-                transition: "color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = t.textDisplay)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = t.textSecondary)}
-            >
+            <Button type="submit" variant="ghost" size="sm">
               Sign out →
-            </button>
+            </Button>
           </form>
         </div>
 

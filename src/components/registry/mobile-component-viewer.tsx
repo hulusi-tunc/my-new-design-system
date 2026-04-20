@@ -10,9 +10,6 @@ import type { DSComponent, DSManifest } from "@/lib/types";
  * Stand-in for ComponentExplorer on non-web platforms. Mobile DSes can't
  * run in a browser sandbox, so we show screenshots + the raw source file
  * for each component instead of a live preview.
- *
- * This is intentionally minimal for Phase 3 — Phase 4a will flesh it out
- * once real iOS/Android systems appear in the registry.
  */
 export function MobileComponentViewer({ manifest }: { manifest: DSManifest }) {
   const { theme } = useTheme();
@@ -333,7 +330,6 @@ function CodeBody({
         style={{
           ...baseStyle,
           color: t.textDisabled,
-          fontStyle: "italic",
           whiteSpace: "normal",
         }}
       >

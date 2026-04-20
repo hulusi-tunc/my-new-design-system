@@ -98,27 +98,27 @@ Supabase Auth with GitHub OAuth. See:
 - `src/app/login/` — login page
 - Middleware gracefully skips auth when Supabase env vars aren't set (for local dev without credentials)
 
-### Synced UI Components
+### Hubera UI Layer
 
-These directories are **synced** with `~/Desktop/octopus` and must stay identical:
+Hubera's own UI lives in two places:
 
-- `src/styles/*` — design tokens and color utilities
-- `src/components/ui/*` — UI components
-- `src/components/providers/*` — ThemeProvider, RoleProvider
-- `src/app/globals.css`
+- `src/components/hub/*` — the in-app component library (Button, Input, Card, Modal, Tabs, etc.) exported through `src/components/hub/index.ts`. Import via `@/components/hub`.
+- `src/components/editorial.tsx` — shared editorial primitives (Eyebrow, Rule, SectionHeader, PrimaryPill, GhostArrowLink, CopyCommand) used by landing/marketing pages.
 
-**NOT synced** (project-specific): `src/components/ds-header.tsx`, `src/components/ds-topnav.tsx`, `src/components/dashboard-shell.tsx`, `src/components/registry/*`, `src/components/brand/*`, route pages, `layout.tsx`.
+Tokens live in a single file: `src/lib/nothing-tokens.ts` (`getNd`, `getShadow`, `motion`, `swatchRadii`, `applyType`). The legacy `src/styles/` and `src/components/ui/` directories have been removed.
+
+Project-specific shells (not part of the reusable library): `src/components/ds-header.tsx`, `src/components/ds-topnav.tsx`, `src/components/ds-sidebar.tsx`, `src/components/dashboard-shell.tsx`, `src/components/site-header.tsx`, `src/components/site-footer.tsx`, `src/components/registry/*`, `src/components/brand/*`.
 
 ### Component Authoring Pattern
 
-All UI components follow the same pattern — do not deviate:
+All `hub/*` components follow the same pattern — do not deviate:
 
 1. `"use client"` directive
 2. Props interface extending native HTML attributes, with custom variant/size props
 3. Size config object with pixel values (height, padding, fontSize, radius, gap)
 4. `forwardRef` wrapper for ref forwarding
-5. `useTheme()` → `getSemanticTokens(theme, brandPalette)` OR `getNd(theme)` for Nothing-style → inline `style` objects
-6. Hover/focus states managed via `useState` + JS event handlers (not CSS pseudo-classes)
+5. `useTheme()` → `getNd(theme)` from `@/lib/nothing-tokens` → inline `style` objects (no `className`-driven theming)
+6. Hover/focus/pressed states managed via `useState` + JS event handlers (not CSS pseudo-classes)
 7. **Tailwind is layout-only** — never use Tailwind for component color, sizing, or theming
 
 ### Dark Mode

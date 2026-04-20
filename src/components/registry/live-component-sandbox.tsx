@@ -456,14 +456,18 @@ export default function App() {
  */
 function buildCycleStage(entries: AppComponentEntry[]): string {
   // Each entry becomes one JSX case inside a `switch` by index. The default
-  // case returns null so a misalignment never crashes the preview.
+  // case leaves active as null so a misalignment never crashes the preview.
   const cases = entries
     .map(
-      (entry, i) => `        case ${i}: return (${entry.exampleJsx});`
+      (entry, i) =>
+        `      case ${i}: active = (${entry.exampleJsx}); break;`
     )
     .join("\n");
 
-  return `(() => {
+  // The outer `{ (() => {…})() }` is required because this snippet is spliced
+  // inline into JSX — a bare IIFE is a JS expression, not a JSX node, so it
+  // must sit inside curly braces.
+  return `{(() => {
     const [index, setIndex] = useState(0);
     useEffect(() => {
       const id = setInterval(
@@ -472,12 +476,11 @@ function buildCycleStage(entries: AppComponentEntry[]): string {
       );
       return () => clearInterval(id);
     }, []);
-    const active = (() => {
-      switch (index) {
+    let active = null;
+    switch (index) {
 ${cases}
-        default: return null;
-      }
-    })();
+      default: active = null;
+    }
     return (
       <div style={{
         position: "fixed",
@@ -504,7 +507,7 @@ ${cases}
         <style>{\`@keyframes hubera-cycle-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }\`}</style>
       </div>
     );
-  })()`;
+  })()}`;
 }
 
 function buildSingleStage(jsx: string): string {

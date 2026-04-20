@@ -6,9 +6,9 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
 import {
   Eyebrow,
-  PrimaryPill,
   SectionHeader,
 } from "@/components/editorial";
+import { Button } from "@/components/hub";
 
 interface DashboardUser {
   email: string;
@@ -147,9 +147,9 @@ export function DashboardClient({
             >
               You haven&apos;t published any design systems yet.
             </p>
-            <PrimaryPill href="/submit">
+            <Button variant="primary" size="md" href="/ingest/new">
               Publish your first system
-            </PrimaryPill>
+            </Button>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
@@ -166,31 +166,11 @@ export function DashboardClient({
 /* ─────────────── Sign-out ghost button (matches GhostArrowLink visually) */
 
 function SignOutButton() {
-  const { theme } = useTheme();
-  const t = getNd(theme);
-  const [hovered, setHovered] = useState(false);
-
   return (
     <form action="/auth/signout" method="POST" style={{ display: "inline" }}>
-      <button
-        type="submit"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          fontFamily: editorialFonts.mono,
-          fontSize: 11,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          background: "transparent",
-          color: hovered ? t.textDisplay : t.textSecondary,
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-          transition: "color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
-        }}
-      >
+      <Button type="submit" variant="ghost" size="sm">
         Sign out →
-      </button>
+      </Button>
     </form>
   );
 }

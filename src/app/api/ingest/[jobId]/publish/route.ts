@@ -69,6 +69,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       repository_url: manifest.repository,
       install_path: manifest.installPath ?? null,
       default_branch: manifest.defaultBranch ?? "main",
+      platform: manifest.platform ?? job.platform,
       technology: manifest.technology ?? [],
       tags: manifest.tags ?? [],
       architecture: manifest.architecture ?? null,

@@ -8,7 +8,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "node scripts/seed-supabase.mjs"
+    "seed": "node scripts/seed-supabase.mjs",
+    "db:link": "supabase link --project-ref bqbvragozchqhcruzwvy",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "db:status": "supabase migration list"
   },
   "dependencies": {
     "@codesandbox/sandpack-react": "^2.20.0",
@@ -29,6 +33,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "supabase": "^2.92.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

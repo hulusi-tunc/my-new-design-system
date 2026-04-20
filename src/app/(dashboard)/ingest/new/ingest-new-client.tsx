@@ -25,7 +25,7 @@ export function IngestNewClient() {
   const router = useRouter();
 
   const [repoUrl, setRepoUrl] = useState("");
-  const [platform, setPlatform] = useState<DSPlatform>("ios-swiftui");
+  const [platform, setPlatform] = useState<DSPlatform>("web-react");
   const [branch, setBranch] = useState("");
   const [subpath, setSubpath] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -107,8 +107,8 @@ export function IngestNewClient() {
               ))}
             </div>
             <Body size="sm" tone="secondary">
-              iOS · SwiftUI is fully supported today. Other platforms return an
-              empty draft — you can still publish manually.
+              Web · React and iOS · SwiftUI are the most accurate. Other
+              platforms still extract — quality varies.
             </Body>
           </Stack>
 

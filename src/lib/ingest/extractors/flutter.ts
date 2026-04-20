@@ -7,31 +7,32 @@ import type {
 import type { DSComponent } from "@/lib/types";
 import { commonAncestor, dirname, suggestSlug, toTitleCase } from "./_shared";
 
-const SWIFT_EXT = /\.swift$/;
-const VIEW_STRUCT =
-  /(?:public|internal|open|private|fileprivate)?\s*struct\s+(\w+)\s*:\s*(?:SwiftUI\.)?View\b/g;
-const COLOR_EXT_MARKER = /extension\s+(?:SwiftUI\.)?Color\b/;
-const FONT_EXT_MARKER = /extension\s+(?:SwiftUI\.)?Font\b/;
+const DART_EXT = /\.dart$/;
+const SKIP_PATH = /(?:^|\/)(?:\.dart_tool|build|\.pub-cache|test|integration_test)\//;
+const GENERATED_FILE = /\.(g|freezed)\.dart$/;
 
-// static let|var <name> = ... Color(red: r, green: g, blue: b [, opacity: a])
-const COLOR_RGB_LET =
-  /static\s+(?:let|var)\s+(\w+)\s*[:=][^=\n]*?Color\(\s*red:\s*([0-9.]+)\s*,\s*green:\s*([0-9.]+)\s*,\s*blue:\s*([0-9.]+)/g;
+const WIDGET_CLASS =
+  /class\s+(\w+)\s+extends\s+(?:StatelessWidget|StatefulWidget|ConsumerWidget|HookWidget|HookConsumerWidget)\b/g;
 
-// static let|var <name> = Color(hex: "#FFFFFF") — common extension
-const COLOR_HEX_LET =
-  /static\s+(?:let|var)\s+(\w+)\s*[:=][^=\n]*?Color\(\s*hex:\s*"?#?([0-9a-fA-F]{3,8})"?\s*\)/g;
+const COLOR_LITERAL =
+  /(?:static\s+)?(?:const|final)\s+(?:Color\s+)?(\w+)\s*=\s*Color\(\s*0x([0-9a-fA-F]{6,8})\s*\)/g;
+
+const TOKEN_FILENAME =
+  /(?:^|\/)(?:colou?rs?|tokens?|theme|themes|palette|app_colou?rs?|app_theme)\.dart$/i;
 
 const FILE_SIZE_CAP = 256 * 1024;
 
-export const iosSwiftuiExtractor: Extractor = {
-  platform: "ios-swiftui",
+export const flutterExtractor: Extractor = {
+  platform: "flutter",
   async extract(input: ExtractorInput): Promise<DraftManifest> {
     const warnings: ExtractionWarning[] = [];
 
     const subpath = (input.subpath ?? "").replace(/^\/+|\/+$/g, "");
     const scoped = input.tree.filter((e) => {
       if (e.type !== "blob") return false;
-      if (!SWIFT_EXT.test(e.path)) return false;
+      if (!DART_EXT.test(e.path)) return false;
+      if (GENERATED_FILE.test(e.path)) return false;
+      if (SKIP_PATH.test("/" + e.path)) return false;
       if (subpath && !e.path.startsWith(subpath + "/")) return false;
       if (e.size > FILE_SIZE_CAP) return false;
       return true;
@@ -39,10 +40,10 @@ export const iosSwiftuiExtractor: Extractor = {
 
     if (scoped.length === 0) {
       warnings.push({
-        kind: "no_swift_files",
+        kind: "no_dart_files",
         message: subpath
-          ? `No .swift files found under ${subpath}.`
-          : "No .swift files found in the repo tree.",
+          ? `No .dart files found under ${subpath}.`
+          : "No .dart files found in the repo tree.",
       });
     }
 
@@ -52,37 +53,48 @@ export const iosSwiftuiExtractor: Extractor = {
       variants: number;
       fullPath: string;
     }> = [];
-    const tokenFiles: Array<{ path: string; content: string }> = [];
+    const tokenFiles: Array<{ path: string; content: string; role: string }> = [];
 
     for (const entry of scoped) {
       const content = await input.readFile(entry.path);
       if (!content) continue;
 
+      WIDGET_CLASS.lastIndex = 0;
+      const widgetMatches = [...content.matchAll(WIDGET_CLASS)];
+      const isNamedTokenFile = TOKEN_FILENAME.test(entry.path);
+      COLOR_LITERAL.lastIndex = 0;
+      const hasColorLiterals = COLOR_LITERAL.test(content);
+      COLOR_LITERAL.lastIndex = 0;
+
       const isTokenFile =
-        COLOR_EXT_MARKER.test(content) || FONT_EXT_MARKER.test(content);
+        isNamedTokenFile || (widgetMatches.length === 0 && hasColorLiterals);
 
       if (isTokenFile) {
-        tokenFiles.push({ path: entry.path, content });
+        const lower = entry.path.toLowerCase();
+        const role = /theme/.test(lower)
+          ? "themeData"
+          : /typo|font/.test(lower)
+            ? "typographyDart"
+            : "colorsDart";
+        tokenFiles.push({ path: entry.path, content, role });
         continue;
       }
 
-      VIEW_STRUCT.lastIndex = 0;
-      const matches = [...content.matchAll(VIEW_STRUCT)];
-      if (matches.length === 0) continue;
+      if (widgetMatches.length === 0) continue;
 
-      const primaryName = matches[0][1];
+      const primaryName = widgetMatches[0][1];
       const fileName = entry.path.split("/").pop() ?? entry.path;
       componentEntries.push({
         name: primaryName,
         file: fileName,
-        variants: matches.length,
+        variants: widgetMatches.length,
         fullPath: entry.path,
       });
     }
 
     const componentsDir =
       commonAncestor(componentEntries.map((c) => dirname(c.fullPath))) ||
-      (subpath ? subpath : "Sources");
+      (subpath || "lib");
 
     const colors = extractColors(tokenFiles);
 
@@ -96,20 +108,20 @@ export const iosSwiftuiExtractor: Extractor = {
       warnings.push({
         kind: "no_components",
         message:
-          "No SwiftUI View structs detected. Extractor looks for `struct X: View`.",
+          "No Flutter widgets detected. Extractor looks for `class X extends StatelessWidget|StatefulWidget`.",
       });
     }
     if (Object.keys(colors).length === 0 && tokenFiles.length > 0) {
       warnings.push({
         kind: "no_colors",
         message:
-          "Found Color extension files but couldn't parse any named color tokens.",
+          "Found theme/color files but couldn't parse named Color tokens (looking for `const X = Color(0xFF...)`).",
       });
     } else if (tokenFiles.length === 0) {
       warnings.push({
         kind: "no_token_files",
         message:
-          "No Color/Font extension files found. Design tokens may be declared elsewhere.",
+          "No theme/colors/tokens .dart file found. ThemeData may live elsewhere.",
       });
     }
 
@@ -117,10 +129,10 @@ export const iosSwiftuiExtractor: Extractor = {
     const today = new Date().toISOString().split("T")[0];
 
     return {
-      platform: "ios-swiftui",
+      platform: "flutter",
       slug,
       name: toTitleCase(input.ref.repo),
-      description: `SwiftUI design system imported from ${input.ref.owner}/${input.ref.repo}`,
+      description: `Flutter design system imported from ${input.ref.owner}/${input.ref.repo}`,
       version: "0.1.0",
       author: {
         name: input.ref.owner,
@@ -134,15 +146,12 @@ export const iosSwiftuiExtractor: Extractor = {
       repository: `https://github.com/${input.ref.owner}/${input.ref.repo}`,
       defaultBranch: input.ref.branch,
       installPath: `design-systems/${slug}`,
-      technology: ["swift-5", "swiftui"],
-      architecture: "swiftui-modifiers",
+      technology: ["flutter", "dart"],
+      architecture: "theme-data",
       sourceLayout: {
-        platform: "ios-swiftui",
+        platform: "flutter",
         componentsDir,
-        files: tokenFiles.map((f) => ({
-          path: f.path,
-          role: /font/i.test(f.path) ? "fontExt" : "colorExt",
-        })),
+        files: tokenFiles.map((f) => ({ path: f.path, role: f.role })),
       },
       tokens: {
         colors:
@@ -150,59 +159,39 @@ export const iosSwiftuiExtractor: Extractor = {
             ? (colors as Record<string, string>)
             : {},
         typography: {
-          fontFamily: "System",
+          fontFamily: "Roboto",
           weights: ["400", "500", "600", "700"],
           scaleSteps: 6,
         },
-        spacing: { unit: "pt", steps: 8 },
+        spacing: { unit: "dp", steps: 8 },
         radius: { steps: 5, full: 9999 },
       },
       components,
       screenshots: { preview: "", gallery: [] },
-      tags: ["imported", "swiftui"],
+      tags: ["imported", "flutter"],
       warnings,
     };
   },
 };
-
-// ── Helpers ──
 
 function extractColors(
   files: Array<{ path: string; content: string }>
 ): Record<string, string> {
   const result: Record<string, string> = {};
   for (const { content } of files) {
-    COLOR_RGB_LET.lastIndex = 0;
+    COLOR_LITERAL.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = COLOR_RGB_LET.exec(content)) !== null) {
-      const [, name, r, g, b] = m;
-      const hex = rgbFloatToHex(+r, +g, +b);
-      if (name && hex) result[name] = hex;
-    }
-    COLOR_HEX_LET.lastIndex = 0;
-    while ((m = COLOR_HEX_LET.exec(content)) !== null) {
+    while ((m = COLOR_LITERAL.exec(content)) !== null) {
       const [, name, hex] = m;
-      if (name && hex) result[name] = normalizeHex(hex);
+      if (name && hex) result[name] = normalizeFlutterHex(hex);
     }
   }
   return result;
 }
 
-function rgbFloatToHex(r: number, g: number, b: number): string | null {
-  if (![r, g, b].every((v) => Number.isFinite(v))) return null;
-  const to = (v: number) =>
-    Math.round(Math.max(0, Math.min(1, v)) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return ("#" + to(r) + to(g) + to(b)).toUpperCase();
+// Flutter Color(0xAARRGGBB) — alpha at the FRONT. Strip leading AA when 8 chars.
+function normalizeFlutterHex(raw: string): string {
+  let h = raw.toUpperCase();
+  if (h.length === 8) h = h.slice(2);
+  return ("#" + h).slice(0, 7);
 }
-
-function normalizeHex(raw: string): string {
-  let h = raw;
-  if (h.length === 3) {
-    h = h.split("").map((c) => c + c).join("");
-  }
-  if (h.length === 8) h = h.slice(0, 6); // strip alpha
-  return ("#" + h.toUpperCase()).slice(0, 7);
-}
-

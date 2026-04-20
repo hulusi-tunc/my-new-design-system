@@ -1,13 +1,21 @@
 import { parseGitHubRepo, fetchRawFile } from "@/lib/github/fetch-file";
 import type { DSPlatform } from "@/lib/types";
 import { fetchRepoTree } from "./fetch-tree";
+import { webReactExtractor } from "./extractors/web-react";
 import { iosSwiftuiExtractor } from "./extractors/ios-swiftui";
+import { reactNativeExtractor } from "./extractors/react-native";
+import { flutterExtractor } from "./extractors/flutter";
+import { androidComposeExtractor } from "./extractors/android-compose";
 import type { DraftManifest, Extractor, RepoRef } from "./types";
 
 export * from "./types";
 
 const EXTRACTORS: Partial<Record<DSPlatform, Extractor>> = {
+  "web-react": webReactExtractor,
   "ios-swiftui": iosSwiftuiExtractor,
+  "react-native": reactNativeExtractor,
+  flutter: flutterExtractor,
+  "android-compose": androidComposeExtractor,
 };
 
 export interface ExtractRequest {

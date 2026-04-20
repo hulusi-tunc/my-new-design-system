@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useMemo, type CSSProperties } from "react";
 import {
   SandpackProvider,
   SandpackPreview,
   SandpackLayout,
+  useSandpack,
+  type SandpackPreviewRef,
 } from "@codesandbox/sandpack-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
@@ -60,6 +62,13 @@ interface LiveComponentSandboxProps {
    * reacting to multiple real components in rotation.
    */
   cycleComponents?: DSComponent[];
+  /**
+   * Controls whether the in-iframe cycle runs. When false the iframe pins to
+   * the first cycle entry. Toggling this prop posts a message into the iframe
+   * so no re-bundle happens. Default: true. Only has effect when
+   * `cycleComponents.length > 1`.
+   */
+  cyclingEnabled?: boolean;
   /** Preview height — number is pixels, string can be e.g. "100%". Default 360. */
   height?: number | string;
   /**
@@ -67,6 +76,21 @@ interface LiveComponentSandboxProps {
    * embedded inside another container (like a component tile).
    */
   bare?: boolean;
+  /**
+   * If true, the sandbox wrapper + iframe use a transparent background so the
+   * host card's surface color shows through instead of the DS's page bg.
+   * Used by the catalog card overview slide so the preview visually blends
+   * with the card rather than reading as a solid slab.
+   */
+  transparentBg?: boolean;
+  /**
+   * Override the theme used to resolve the DS's own tokens (page bg, text,
+   * borders) and the Sandpack chrome theme. When set, also posts a message
+   * into the iframe toggling `.dark` / `.light` on the document element so
+   * DS theme providers that key off those classes switch accordingly.
+   * Default: follow Hubera's theme.
+   */
+  themeOverride?: "light" | "dark";
 }
 
 /* ── Example code generator ──────────────────────── */
@@ -203,7 +227,7 @@ function rewriteAliasImports(content: string, sandboxPath: string): string {
   // Directory containing the current file (e.g. "/components/ui")
   const fromDir = sandboxPath.slice(0, sandboxPath.lastIndexOf("/"));
 
-  return content.replace(
+  let rewritten = content.replace(
     /(from\s+|import\s+)(["'])@\/([^"']+)\2/g,
     (_match, prefix: string, quote: string, importPath: string) => {
       // Everything lives at sandbox root now, so @/x -> /x
@@ -212,7 +236,70 @@ function rewriteAliasImports(content: string, sandboxPath: string): string {
       return `${prefix}${quote}${relative}${quote}`;
     }
   );
+
+  // Sandpack doesn't have Next.js. Rewrite next/* imports to local shims
+  // injected at /_shims/* by buildSandboxFiles. Without this, components
+  // that reference next/link or next/image throw DependencyNotFoundError.
+  rewritten = rewritten.replace(
+    /(from\s+|import\s+)(["'])next\/(link|image|navigation)\2/g,
+    (_match, prefix: string, quote: string, mod: string) => {
+      const targetAbsolute = `/_shims/next-${mod}`;
+      const relative = relativePathFromTo(fromDir, targetAbsolute);
+      return `${prefix}${quote}${relative}${quote}`;
+    }
+  );
+
+  return rewritten;
 }
+
+/**
+ * Tiny stand-ins for the most common next/* imports used by component
+ * libraries. Sandpack can't run the real Next.js bundler, so these provide
+ * just enough surface area to keep components compiling and rendering.
+ */
+const NEXT_SHIMS: Record<string, string> = {
+  "/_shims/next-link.tsx": `import * as React from "react";
+type LinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string;
+  prefetch?: boolean;
+  replace?: boolean;
+  scroll?: boolean;
+  shallow?: boolean;
+};
+const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
+  ({ href, prefetch: _p, replace: _r, scroll: _s, shallow: _sh, children, ...rest }, ref) => (
+    <a ref={ref} href={href} {...rest}>{children}</a>
+  )
+);
+Link.displayName = "Link";
+export default Link;
+`,
+  "/_shims/next-image.tsx": `import * as React from "react";
+type ImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  priority?: boolean;
+  fill?: boolean;
+};
+const Image = React.forwardRef<HTMLImageElement, ImageProps>(
+  ({ priority: _p, fill: _f, ...rest }, ref) => <img ref={ref} {...rest} />
+);
+Image.displayName = "Image";
+export default Image;
+`,
+  "/_shims/next-navigation.ts": `export const useRouter = () => ({
+  push: () => {}, replace: () => {}, back: () => {}, forward: () => {},
+  refresh: () => {}, prefetch: () => {},
+});
+export const usePathname = () => "/";
+export const useSearchParams = () => new URLSearchParams();
+export const useParams = () => ({});
+export const redirect = (_url: string) => { throw new Error("redirect called in sandbox"); };
+export const notFound = () => { throw new Error("notFound called in sandbox"); };
+`,
+};
 
 function relativePathFromTo(fromDir: string, to: string): string {
   const fromParts = fromDir.split("/").filter(Boolean);
@@ -254,6 +341,59 @@ interface BuildOptions {
   cycleComponents?: DSComponent[];
 }
 
+/**
+ * Strip directives Sandpack's CSS loader can't resolve. Without this,
+ * v4-style `@import "tailwindcss"` crashes the bundler with a cryptic
+ * "Path must be a string. Received null" (it tries to resolve the bare
+ * package name and gets nothing back).
+ *
+ * We keep raw custom-property declarations (`--foo: #fff`) intact — those
+ * are what CSS-variables DSes actually rely on for styling.
+ *
+ * Returns both the sanitized CSS and a flag indicating whether the file
+ * used Tailwind in some form. The caller uses that flag to decide whether
+ * to inject the Tailwind Play CDN so utility classes still render.
+ */
+function sanitizeCssForSandbox(css: string): {
+  css: string;
+  usedTailwind: boolean;
+} {
+  const usedTailwind =
+    /@import\s+(?:url\()?\s*["'][^"']*(?:tailwind|tw-)[^"']*["']/i.test(css) ||
+    /@tailwind\s+[a-z-]+/i.test(css) ||
+    /@apply\s+/i.test(css);
+
+  const cleaned = css
+    // Strip ANY @import that points at a bare package name (no ./, no URL).
+    // Sandpack's CSS loader crashes with "Path must be a string. Received
+    // null" trying to resolve these. Keep relative imports + URLs intact.
+    .replace(
+      /@import\s+(?:url\()?\s*["']([^"']+)["']\s*\)?\s*;?/gi,
+      (match, importPath: string) => {
+        if (/^[./]/.test(importPath)) return match;
+        if (/^https?:\/\//.test(importPath)) return match;
+        return "";
+      }
+    )
+    // Tailwind v3 `@tailwind base;` / `@tailwind utilities;` etc.
+    .replace(/@tailwind\s+[a-z-]+\s*;?/gi, "")
+    // v4 `@plugin` / `@config` directives — Sandpack doesn't run the compiler
+    .replace(/@plugin\s+[^;]+;?/gi, "")
+    .replace(/@config\s+[^;]+;?/gi, "")
+    // v4 `@custom-variant dark (...)` — Tailwind-specific, no parser here
+    .replace(/@custom-variant\s+[^;{]+(?:\([^)]*\))?\s*;?/gi, "")
+    // v4 `@theme { ... }` / `@theme inline { ... }` blocks
+    .replace(/@theme(?:\s+\w+)?\s*\{[\s\S]*?\}/gi, "")
+    // `@apply foo bar;` — applies utilities that don't exist without Tailwind
+    .replace(/@apply\s+[^;]+;?/gi, "");
+
+  return { css: cleaned, usedTailwind };
+}
+
+function manifestUsesTailwind(manifest: DSManifest): boolean {
+  return manifest.technology.some((t) => /tailwind/i.test(t));
+}
+
 function buildSandboxFiles(
   repoFiles: Record<string, string>,
   manifest: DSManifest,
@@ -271,10 +411,15 @@ function buildSandboxFiles(
 
     if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(sandboxPath)) {
       files[sandboxPath] = rewriteAliasImports(contents, sandboxPath);
+    } else if (/\.css$/.test(sandboxPath)) {
+      const { css } = sanitizeCssForSandbox(contents);
+      files[sandboxPath] = css;
     } else {
       files[sandboxPath] = contents;
     }
   }
+
+  const needsTailwindCdn = manifestUsesTailwind(manifest);
 
   const layout = manifest.sourceLayout;
   // Compute paths without the leading "src/" now — everything lives at root
@@ -318,6 +463,7 @@ function buildSandboxFiles(
     mode: buildOpts.mode,
     displaySize: buildOpts.displaySize,
     globalsCssPath: globalsCssSandboxPath,
+    needsTailwindCdn,
   });
 
   // Sandpack's react-ts template provides its own /index.tsx that imports
@@ -325,6 +471,12 @@ function buildSandboxFiles(
   // the React DOM mount. This avoids a class of subtle file-resolution
   // errors from trying to fight the template.
   files["/App.tsx"] = appTsx;
+
+  // Always inject Next.js shims; rewriteAliasImports will only reference
+  // them if the source actually imports next/link, next/image, etc.
+  for (const [path, contents] of Object.entries(NEXT_SHIMS)) {
+    files[path] = contents;
+  }
 
   return files;
 }
@@ -366,6 +518,8 @@ interface AppEntryOptions {
   displaySize: "sm" | "md" | "lg" | "xl";
   /** Import specifier (with leading "./") for the DS's globals.css, or null to skip. */
   globalsCssPath: string | null;
+  /** Inject the Tailwind Play CDN so utility classes render even without a build. */
+  needsTailwindCdn: boolean;
 }
 
 /**
@@ -409,35 +563,85 @@ function buildAppEntry(opts: AppEntryOptions): string {
   // mode wins over gallery if both are enabled (cycle is the newer pattern).
   if (!hasCycle && opts.mode === "gallery" && opts.examples && opts.examples.length > 0) {
     const stage = buildGalleryStage(opts.examples, opts.displaySize);
-    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage, opts.needsTailwindCdn);
   }
 
   // Cycle mode — internal setInterval rotates the active snippet every 2s.
   if (hasCycle) {
     imports.unshift(`import { useEffect, useState } from "react";`);
     const stage = buildCycleStage(opts.cycle);
-    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage, opts.needsTailwindCdn);
   }
 
   // Single snippet — the default, used by most previews.
   const stage = buildSingleStage(opts.primary.exampleJsx);
-  return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+  return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage, opts.needsTailwindCdn);
 }
 
 function renderAppWrapper(
   imports: string[],
   wrapperOpen: string[],
   wrapperClose: string[],
-  stageCore: string
+  stageCore: string,
+  needsTailwindCdn: boolean
 ): string {
+  // Always include React hooks for the theme-sync effect below; dedupe with
+  // any existing useEffect/useState imports from cycle mode.
+  if (!imports.some((l) => l.includes('from "react"'))) {
+    imports.unshift(`import { useEffect } from "react";`);
+  } else if (!imports.some((l) => /useEffect/.test(l))) {
+    imports.unshift(`import { useEffect } from "react";`);
+  }
+
+  // When the DS relies on Tailwind classes (e.g. CESP's `bg-[var(--primary-base)]`),
+  // inject the Tailwind Play CDN into the iframe's <head> so those classes
+  // actually compile to styles. Without this, components render unstyled
+  // because Sandpack's react-ts template doesn't run a Tailwind build.
+  const tailwindLoader = needsTailwindCdn
+    ? `
+function useHuberaTailwind() {
+  useEffect(() => {
+    if (document.getElementById("hubera-tailwind-cdn")) return;
+    const script = document.createElement("script");
+    script.id = "hubera-tailwind-cdn";
+    script.src = "https://cdn.tailwindcss.com";
+    document.head.appendChild(script);
+  }, []);
+}`
+    : "";
+
+  const tailwindCall = needsTailwindCdn ? "useHuberaTailwind();" : "";
+
   return `${imports.join("\n")}
 
+function useHuberaTheme() {
+  useEffect(() => {
+    const apply = (mode) => {
+      const el = document.documentElement;
+      el.classList.remove("dark", "light");
+      el.classList.add(mode === "dark" ? "dark" : "light");
+      el.dataset.theme = mode === "dark" ? "dark" : "light";
+    };
+    const onMsg = (e) => {
+      const d = e && e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type !== "hubera:theme") return;
+      apply(d.theme === "dark" ? "dark" : "light");
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+}
+${tailwindLoader}
+
 export default function App() {
+  useHuberaTheme();
+  ${tailwindCall}
   return (
     ${wrapperOpen.join("\n      ")}
       <>
         <style>{\`
-          html, body, #root { margin: 0; padding: 0; height: 100%; overflow: auto; font-family: system-ui, sans-serif; }
+          html, body, #root { margin: 0; padding: 0; height: 100%; overflow: auto; font-family: system-ui, sans-serif; background: transparent; }
           * { box-sizing: border-box; }
         \`}</style>
         ${stageCore}
@@ -467,15 +671,34 @@ function buildCycleStage(entries: AppComponentEntry[]): string {
   // The outer `{ (() => {…})() }` is required because this snippet is spliced
   // inline into JSX — a bare IIFE is a JS expression, not a JSX node, so it
   // must sit inside curly braces.
+  //
+  // Cycling is gated on a `hubera:cycle` postMessage from the parent so the
+  // host (e.g. a catalog card) can pause rotation until the user hovers. The
+  // message is one-shot state, not a handshake — the parent re-sends on every
+  // hover change.
   return `{(() => {
     const [index, setIndex] = useState(0);
+    const [cycling, setCycling] = useState(false);
     useEffect(() => {
+      const onMsg = (e) => {
+        const data = e && e.data;
+        if (!data || typeof data !== "object") return;
+        if (data.type !== "hubera:cycle") return;
+        const next = Boolean(data.enabled);
+        setCycling(next);
+        if (!next) setIndex(0);
+      };
+      window.addEventListener("message", onMsg);
+      return () => window.removeEventListener("message", onMsg);
+    }, []);
+    useEffect(() => {
+      if (!cycling) return;
       const id = setInterval(
         () => setIndex((i) => (i + 1) % ${entries.length}),
         2000
       );
       return () => clearInterval(id);
-    }, []);
+    }, [cycling]);
     let active = null;
     switch (index) {
 ${cases}
@@ -596,15 +819,55 @@ export function LiveComponentSandbox({
   examples,
   mode,
   cycleComponents,
+  cyclingEnabled = true,
   height = 360,
   bare = false,
+  transparentBg = false,
+  themeOverride,
 }: LiveComponentSandboxProps) {
   const { theme } = useTheme();
   const t = getNd(theme);
+  const effectiveTheme: "light" | "dark" =
+    themeOverride ?? (theme === "light" ? "light" : "dark");
   const ds = useMemo(
-    () => resolveDsTokens(manifest.tokens, theme === "light" ? "light" : "dark"),
-    [manifest.tokens, theme]
+    () => resolveDsTokens(manifest.tokens, effectiveTheme),
+    [manifest.tokens, effectiveTheme]
   );
+
+  const previewRef = useRef<SandpackPreviewRef>(null);
+
+  // Post messages to the already-bundled iframe to toggle cycling and switch
+  // DS theme. Sandpack files are identical either way, so this avoids a
+  // re-bundle on every change. On first mount the iframe may not have
+  // finished loading yet — retry for a short window until the message lands.
+  useEffect(() => {
+    let cancelled = false;
+    let attempt = 0;
+    const post = () => {
+      if (cancelled) return;
+      const client = previewRef.current?.getClient();
+      const iframe = (client as { iframe?: HTMLIFrameElement } | null)?.iframe;
+      const target = iframe?.contentWindow;
+      if (target) {
+        target.postMessage(
+          { type: "hubera:cycle", enabled: cyclingEnabled },
+          "*"
+        );
+        target.postMessage(
+          { type: "hubera:theme", theme: effectiveTheme },
+          "*"
+        );
+      }
+      attempt += 1;
+      if (attempt < 20) {
+        setTimeout(post, 200);
+      }
+    };
+    post();
+    return () => {
+      cancelled = true;
+    };
+  }, [cyclingEnabled, effectiveTheme]);
 
   // Infer mode: if examples are provided and mode isn't specified, use gallery
   const effectiveMode: SandboxMode =
@@ -708,7 +971,7 @@ export function LiveComponentSandbox({
   const isFluidHeight = typeof height === "string";
 
   const wrapperStyle: CSSProperties = {
-    background: ds.pageBg,
+    background: transparentBg ? "transparent" : ds.pageBg,
     borderRadius: bare ? 0 : swatchRadii.lg,
     border: bare ? "none" : `1px solid ${t.border}`,
     overflow: "hidden",
@@ -756,7 +1019,7 @@ export function LiveComponentSandbox({
       <SandpackProvider
         template="react-ts"
         files={state.files}
-        theme={theme === "dark" ? "dark" : "light"}
+        theme={effectiveTheme}
         customSetup={{
           dependencies: buildDependencies(manifest),
         }}
@@ -772,24 +1035,110 @@ export function LiveComponentSandbox({
           style={{
             border: "none",
             borderRadius: 0,
+            background: transparentBg ? "transparent" : undefined,
+            position: "relative",
             ...(isFluidHeight
               ? { height: "100%", flex: 1, minHeight: 0 }
               : {}),
           }}
         >
           <SandpackPreview
+            ref={previewRef}
             showNavigator={false}
             showOpenInCodeSandbox={false}
             showRefreshButton={false}
             showRestartButton={false}
+            showSandpackErrorOverlay={false}
             style={{
               height: isFluidHeight ? "100%" : (height as number),
-              background: ds.pageBg,
+              background: transparentBg ? "transparent" : ds.pageBg,
               flex: isFluidHeight ? 1 : undefined,
             }}
           />
+          <SandpackErrorSurface
+            transparentBg={transparentBg}
+            bareOverlay={bare}
+          />
         </SandpackLayout>
       </SandpackProvider>
+    </div>
+  );
+}
+
+/**
+ * Replaces Sandpack's opaque "Something's gone wrong" overlay with a
+ * concise message that actually names the error. Rendered as a child of
+ * SandpackProvider so it can read `sandpack.error` via `useSandpack`.
+ *
+ * Keeps the preview iframe beneath it visible at low opacity so the
+ * user still has some sense of what the preview was trying to become.
+ */
+function SandpackErrorSurface({
+  transparentBg,
+  bareOverlay,
+}: {
+  transparentBg: boolean;
+  bareOverlay: boolean;
+}) {
+  const { theme } = useTheme();
+  const t = getNd(theme);
+  const { sandpack } = useSandpack();
+  if (!sandpack.error) return null;
+
+  const message = sandpack.error.message?.trim() || "Preview failed to compile.";
+  const shortened =
+    message.length > 220 ? message.slice(0, 217).trimEnd() + "…" : message;
+
+  return (
+    <div
+      role="alert"
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        background: transparentBg
+          ? "color-mix(in oklch, currentColor 4%, transparent)"
+          : t.surfaceInk,
+        zIndex: 5,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 480,
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          padding: bareOverlay ? 0 : 16,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: editorialFonts.mono,
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: t.textDisabled,
+          }}
+        >
+          Preview error
+        </span>
+        <span
+          style={{
+            fontFamily: editorialFonts.body,
+            fontSize: 13,
+            lineHeight: 1.4,
+            color: t.textPrimary,
+            wordBreak: "break-word",
+          }}
+        >
+          {shortened}
+        </span>
+      </div>
     </div>
   );
 }

@@ -21,6 +21,102 @@ import {
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
 
+/* ───────────────────────────────────────── Text input — borderless fill */
+
+type TextInputProps = Omit<
+  ComponentProps<"input">,
+  "style" | "ref" | "className" | "size"
+> & {
+  size?: "md" | "lg";
+};
+
+export function TextInput({ size = "md", ...rest }: TextInputProps) {
+  const { theme } = useTheme();
+  const t = getNd(theme);
+  const [focused, setFocused] = useState(false);
+
+  const base: CSSProperties = {
+    width: "100%",
+    padding: size === "lg" ? "16px 22px" : "14px 20px",
+    background: focused ? t.surfaceRaised : t.surfaceInk,
+    border: "none",
+    borderRadius: 12,
+    fontFamily: editorialFonts.body,
+    fontSize: size === "lg" ? 16 : 15,
+    lineHeight: 1.2,
+    color: t.textDisplay,
+    outline: focused ? `2px solid ${t.accent}` : "none",
+    outlineOffset: -2,
+    transition:
+      "background 200ms cubic-bezier(0.165, 0.84, 0.44, 1), outline-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <input
+      {...rest}
+      onFocus={(e) => {
+        setFocused(true);
+        rest.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        rest.onBlur?.(e);
+      }}
+      style={base}
+    />
+  );
+}
+
+/* ───────────────────────────────────────── Text area — borderless fill */
+
+type TextAreaProps = Omit<
+  ComponentProps<"textarea">,
+  "style" | "ref" | "className"
+> & {
+  size?: "md" | "lg";
+};
+
+export function TextArea({ size = "md", rows = 4, ...rest }: TextAreaProps) {
+  const { theme } = useTheme();
+  const t = getNd(theme);
+  const [focused, setFocused] = useState(false);
+
+  const base: CSSProperties = {
+    width: "100%",
+    padding: size === "lg" ? "16px 22px" : "14px 20px",
+    background: focused ? t.surfaceRaised : t.surfaceInk,
+    border: "none",
+    borderRadius: 12,
+    fontFamily: editorialFonts.body,
+    fontSize: size === "lg" ? 16 : 15,
+    lineHeight: 1.5,
+    color: t.textDisplay,
+    outline: focused ? `2px solid ${t.accent}` : "none",
+    outlineOffset: -2,
+    resize: "vertical",
+    transition:
+      "background 200ms cubic-bezier(0.165, 0.84, 0.44, 1), outline-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <textarea
+      {...rest}
+      rows={rows}
+      onFocus={(e) => {
+        setFocused(true);
+        rest.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        rest.onBlur?.(e);
+      }}
+      style={base}
+    />
+  );
+}
+
 /* ───────────────────────────────────────── Text scramble (decrypt reveal) */
 
 const SCRAMBLE_CHARS =
@@ -315,6 +411,7 @@ type PrimaryPillProps = {
   children: ReactNode;
   size?: "md" | "lg";
   trailingArrow?: boolean;
+  fullWidth?: boolean;
 } & (
   | ({ as?: "link"; href: string } & Omit<
       ComponentProps<typeof Link>,
@@ -327,15 +424,23 @@ type PrimaryPillProps = {
 );
 
 export function PrimaryPill(props: PrimaryPillProps) {
-  const { children, size = "md", trailingArrow = true, ...rest } = props;
+  const {
+    children,
+    size = "md",
+    trailingArrow = true,
+    fullWidth = false,
+    ...rest
+  } = props;
   const { theme } = useTheme();
   const t = getNd(theme);
   const [hovered, setHovered] = useState(false);
 
   const style: CSSProperties = {
-    display: "inline-flex",
+    display: fullWidth ? "flex" : "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 12,
+    width: fullWidth ? "100%" : undefined,
     fontFamily: editorialFonts.body,
     fontSize: size === "lg" ? 16 : 15,
     fontWeight: 500,
@@ -347,8 +452,11 @@ export function PrimaryPill(props: PrimaryPillProps) {
     border: "none",
     cursor: "pointer",
     transition:
-      "background 240ms cubic-bezier(0.165, 0.84, 0.44, 1), transform 240ms cubic-bezier(0.165, 0.84, 0.44, 1)",
+      "background 220ms cubic-bezier(0.165, 0.84, 0.44, 1), transform 220ms cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 220ms cubic-bezier(0.165, 0.84, 0.44, 1)",
     transform: hovered ? "translateY(-1px)" : "translateY(0)",
+    boxShadow: hovered
+      ? `0 8px 24px -6px ${t.accent}, 0 2px 4px rgba(0,0,0,0.08)`
+      : "0 0 0 0 rgba(0,0,0,0)",
   };
 
   const content = (

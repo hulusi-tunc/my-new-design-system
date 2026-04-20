@@ -569,6 +569,66 @@ function pickLivePreviewComponent(manifest: DSManifest): DSComponent | null {
   return manifest.components[0] ?? null;
 }
 
+/**
+ * Pick up to 5 representative components to rotate through in the overview.
+ * Keeps Button first (most universal), then picks one each from other
+ * families by normalised name prefix so the rotation feels diverse — not
+ * "Button · CompactButton · FancyButton" repeating the same shape.
+ */
+function pickCycleComponents(manifest: DSManifest, max = 5): DSComponent[] {
+  const normalise = (name: string) => name.toLowerCase().replace(/[\s_-]/g, "");
+  const all = manifest.components;
+  const out: DSComponent[] = [];
+  const seenFamilies = new Set<string>();
+
+  // Always lead with the Button if the DS has one
+  const button = all.find((c) => /^button$/.test(normalise(c.name)));
+  if (button) {
+    out.push(button);
+    seenFamilies.add("button");
+  }
+
+  // Then, for each subsequent component, only take one per "family" keyword
+  const familyKeywords = [
+    "button",
+    "input",
+    "badge",
+    "card",
+    "tab",
+    "checkbox",
+    "switch",
+    "select",
+    "toast",
+    "tooltip",
+    "avatar",
+    "tag",
+    "chip",
+    "menu",
+    "alert",
+    "table",
+  ];
+
+  for (const c of all) {
+    if (out.length >= max) break;
+    if (out.includes(c)) continue;
+    const n = normalise(c.name);
+    const family = familyKeywords.find((kw) => n.includes(kw)) ?? n;
+    if (seenFamilies.has(family)) continue;
+    seenFamilies.add(family);
+    out.push(c);
+  }
+
+  // If we still don't have enough, fill from remaining in declaration order
+  if (out.length < max) {
+    for (const c of all) {
+      if (out.length >= max) break;
+      if (!out.includes(c)) out.push(c);
+    }
+  }
+
+  return out;
+}
+
 function ComponentsSlide({ manifest, ds, t, inView }: SlideProps) {
   const count = manifest.components.length;
   const previewComponent = useMemo(
@@ -676,63 +736,44 @@ function ComponentsSlide({ manifest, ds, t, inView }: SlideProps) {
 /* ── Overview slide ─────────────────────────────────── */
 
 /**
- * Hubera-style "design system at a glance" slide.
- * Four quadrants separated by hairline rules (no rounded cells, no filled
- * backgrounds) — echoing the Linear/Vercel editorial structure of the rest
- * of the app. Each quadrant has a small mono eyebrow label and one clear
- * artefact from the DS:
- *   Type · Palette
- *   Buttons · Components
- * Every dimension uses container-query units so it scales cleanly across
- * 3-col / 2-col / 1-col responsive grids.
+ * "Signature" overview — three horizontal bands, each carrying exactly one
+ * token choice the DS has actually made:
+ *   1. Typography — the DS's own font, loaded via Google Fonts
+ *   2. Brand — a single dominant color block with the hex
+ *   3. Component — one large primary button showing radius + font + color
+ * The earlier bento-grid version (tiny pills, 10-shade rainbow, stub search)
+ * was visually generic because each cell communicated a weak signal. A DS's
+ * identity is its font + brand + component feel, not a list of tokens.
  */
-function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered }: SlideProps) {
-  const groups = useMemo(
-    () => resolveOverviewColors(manifest.tokens.colors),
-    [manifest.tokens.colors]
-  );
-  const palette = useMemo(
-    () => extractPalette(manifest.tokens.colors, 10),
-    [manifest.tokens.colors]
-  );
-  const secondary = groups.secondary?.mainHex ?? brand;
-
-  // Font name to show in the Type quadrant — always the primary family, no fallbacks.
+function OverviewSlide({ manifest, brand, dsFont, ds, t, inView }: SlideProps) {
   const fontName =
     manifest.tokens.typography?.fontFamily?.split(",")[0]?.replace(/['"]/g, "").trim() ||
     "System";
+
+  // The DS's actual Button component, rendered live in Sandpack — not a
+  // CSS approximation. Falls back to the first component if the manifest
+  // has no explicit Button entry.
+  const previewComponent = useMemo(
+    () => pickLivePreviewComponent(manifest),
+    [manifest]
+  );
+  // Up to 5 real components, rotated every 2s inside the sandbox iframe.
+  // Bundled together so the rotation is free after the upfront bundle cost.
+  const cycleComponents = useMemo(
+    () => pickCycleComponents(manifest, 5),
+    [manifest]
+  );
 
   const eyebrow: CSSProperties = {
     fontFamily: editorialFonts.mono,
     fontSize: "clamp(9px, 2cqw, 11px)",
     letterSpacing: "0.1em",
     textTransform: "uppercase",
-    color: ds.textDisabled,
+    color: t.textDisabled,
     fontWeight: 500,
   };
 
-  const quadrant: CSSProperties = {
-    position: "relative",
-    padding: "5cqw 5cqw 4cqw",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    minHeight: 0,
-    overflow: "hidden",
-    transition: "border-color 200ms ease-out",
-  };
-
-  // Chrome colors — use Hubera tokens (not DS tokens) so borders and neutral
-  // fills stay visible against the Hubera-themed card background.
-  //
-  // Quadrant hairlines are a single derived color (~4% off the card bg) and
-  // do NOT darken on hover — the card already has its own lift motion, the
-  // lines shouldn't also shift. Inner-element borders (secondary button,
-  // search, Draft chip) still step up on hover since those are the "things"
-  // that should read more clearly.
   const hair = `color-mix(in oklch, ${t.textDisplay} 4%, ${t.surface})`;
-  const innerBg = t.surfaceInk;
-  const innerBorder = hovered ? t.borderStrong : t.borderVisible;
 
   return (
     <div
@@ -740,245 +781,142 @@ function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered }: SlideProps) 
         width: "100%",
         height: "100%",
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gridTemplateRows: "1fr 1fr",
+        gridTemplateRows: "1.1fr auto 1fr",
+        gap: 0,
+        padding: 0,
         background: "transparent",
       }}
     >
-      {/* ── Top-left: Type ───────────────────────────── */}
-      <div style={{ ...quadrant, borderRight: `1px solid ${hair}`, borderBottom: `1px solid ${hair}` }}>
-        <span style={eyebrow}>Type</span>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: 0,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: dsFont,
-              fontSize: "clamp(48px, 18cqw, 132px)",
-              fontWeight: Number(ds.weightBold),
-              color: ds.textDisplay,
-              lineHeight: 0.92,
-              letterSpacing: "-0.045em",
-            }}
-          >
-            Aa
-          </span>
-        </div>
+      {/* ── 1. Typography band ─────────────────────────
+          Big "Aa" in the DS's actual font. Differentiates sans-DSes
+          (Space Grotesk vs Geist vs Inter) once Google Fonts load. */}
+      <div
+        style={{
+          position: "relative",
+          padding: "5cqw 6cqw",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          borderBottom: `1px solid ${hair}`,
+          gap: "3cqw",
+        }}
+      >
         <span
           style={{
             fontFamily: dsFont,
-            fontSize: "clamp(10px, 2.4cqw, 14px)",
-            fontWeight: Number(ds.weightMedium),
-            color: ds.textSecondary,
-            letterSpacing: "-0.005em",
+            fontSize: "clamp(48px, 20cqw, 150px)",
+            fontWeight: Number(ds.weightBold),
+            color: ds.textDisplay,
+            lineHeight: 0.9,
+            letterSpacing: "-0.045em",
           }}
         >
-          {fontName}
+          Aa
         </span>
-      </div>
-
-      {/* ── Top-right: Palette ───────────────────────── */}
-      <div style={{ ...quadrant, borderBottom: `1px solid ${hair}` }}>
-        <span style={eyebrow}>Palette</span>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", minHeight: 0 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${Math.max(palette.length, 1)}, 1fr)`,
-              width: "100%",
-              aspectRatio: `${palette.length} / 1`,
-              maxHeight: "55%",
-              borderRadius: "clamp(3px, 0.8cqw, 6px)",
-              overflow: "hidden",
-            }}
-          >
-            {palette.map((c, i) => (
-              <span key={`${c}-${i}`} style={{ background: c }} />
-            ))}
-          </div>
-        </div>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "2cqw",
-            fontFamily: editorialFonts.mono,
-            fontSize: "clamp(9px, 2cqw, 12px)",
-            color: ds.textSecondary,
-            letterSpacing: "-0.005em",
-          }}
-        >
-          <span>{displayHex(brand)}</span>
-          <span style={{ color: ds.textDisabled }}>
-            {palette.length} shades
-          </span>
-        </div>
-      </div>
-
-      {/* ── Bottom-left: Buttons ─────────────────────── */}
-      <div style={{ ...quadrant, borderRight: `1px solid ${hair}` }}>
-        <span style={eyebrow}>Buttons</span>
-        <div
-          style={{
-            flex: 1,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
+            gap: "0.6cqw",
             alignItems: "flex-start",
-            gap: "2.2cqw",
-            minHeight: 0,
           }}
         >
+          <span style={eyebrow}>Typeface</span>
           <span
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "1.4cqw",
-              padding: "clamp(6px, 1.8cqw, 11px) clamp(12px, 3.2cqw, 20px)",
-              background: brand,
-              color: ds.textOnBrand,
-              borderRadius: ds.radiusMd,
               fontFamily: dsFont,
-              fontSize: "clamp(11px, 2.8cqw, 15px)",
+              fontSize: "clamp(14px, 4cqw, 22px)",
               fontWeight: Number(ds.weightSemibold),
-              letterSpacing: "-0.005em",
+              color: ds.textDisplay,
+              letterSpacing: "-0.01em",
+              lineHeight: 1.05,
             }}
           >
-            Get started
-          </span>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "1.4cqw",
-              padding: "clamp(5px, 1.6cqw, 10px) clamp(12px, 3.2cqw, 20px)",
-              background: innerBg,
-              color: ds.textPrimary,
-              border: `1px solid ${innerBorder}`,
-              borderRadius: ds.radiusMd,
-              fontFamily: dsFont,
-              fontSize: "clamp(11px, 2.8cqw, 15px)",
-              fontWeight: Number(ds.weightMedium),
-              letterSpacing: "-0.005em",
-              transition: "border-color 200ms ease-out, background 200ms ease-out",
-            }}
-          >
-            Secondary
+            {fontName}
           </span>
         </div>
+      </div>
+
+      {/* ── 2. Brand color band ─────────────────────────
+          One tall strip saturated in the DS's actual brand, with hex
+          overlaid. Impossible to miss what color a DS leads with. */}
+      <div
+        style={{
+          position: "relative",
+          height: "clamp(48px, 14cqw, 96px)",
+          background: brand,
+          display: "flex",
+          alignItems: "center",
+          paddingLeft: "6cqw",
+          paddingRight: "6cqw",
+          justifyContent: "space-between",
+          borderBottom: `1px solid ${hair}`,
+        }}
+      >
         <span
           style={{
             fontFamily: editorialFonts.mono,
-            fontSize: "clamp(9px, 2cqw, 12px)",
-            color: ds.textDisabled,
+            fontSize: "clamp(10px, 2.5cqw, 14px)",
+            letterSpacing: "0.05em",
+            color: readableOn(brand),
+            opacity: 0.7,
+            textTransform: "uppercase",
+            fontWeight: 500,
+          }}
+        >
+          Brand
+        </span>
+        <span
+          style={{
+            fontFamily: editorialFonts.mono,
+            fontSize: "clamp(11px, 3cqw, 16px)",
+            fontWeight: 500,
+            color: readableOn(brand),
             letterSpacing: "-0.005em",
           }}
         >
-          r {typeof ds.radiusMd === "number" ? `${ds.radiusMd}px` : ds.radiusMd}
+          {displayHex(brand)}
         </span>
       </div>
 
-      {/* ── Bottom-right: Components ─────────────────── */}
-      <div style={quadrant}>
-        <span style={eyebrow}>Components</span>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: "2.4cqw",
-            minHeight: 0,
-          }}
-        >
-          {/* Search input */}
-          <div
+      {/* ── 3. Component band ───────────────────────────
+          The DS's real Button component, rendered by Sandpack from its
+          actual source on GitHub — no CSS approximation. Mounts only once
+          the card enters the viewport so off-screen cards stay cheap. */}
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          minHeight: 0,
+        }}
+      >
+        {inView && previewComponent ? (
+          <LiveComponentSandbox
+            manifest={manifest}
+            component={previewComponent}
+            cycleComponents={cycleComponents}
+            height="100%"
+            bare
+          />
+        ) : (
+          <span
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "1.6cqw",
-              padding: "clamp(5px, 1.6cqw, 10px) clamp(10px, 2.8cqw, 16px)",
-              background: innerBg,
-              border: `1px solid ${innerBorder}`,
-              borderRadius: ds.radiusMd,
-              width: "100%",
-              transition: "border-color 200ms ease-out, background 200ms ease-out",
+              fontFamily: editorialFonts.mono,
+              fontSize: "clamp(9px, 2.2cqw, 12px)",
+              color: t.textDisabled,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
             }}
           >
-            <SearchIcon color={t.textSecondary} />
-            <span
-              style={{
-                fontFamily: dsFont,
-                fontSize: "clamp(11px, 2.8cqw, 14px)",
-                color: ds.textDisabled,
-              }}
-            >
-              Search
-            </span>
-          </div>
-          {/* Chip row */}
-          <div style={{ display: "flex", gap: "1.2cqw", flexWrap: "wrap" }}>
-            <Chip label="Active" bg={brand} color={ds.textOnBrand} dsFont={dsFont} ds={ds} />
-            <Chip label="Pending" bg={secondary} color={readableOn(secondary)} dsFont={dsFont} ds={ds} />
-            <Chip label="Draft" bg={innerBg} color={t.textSecondary} border={innerBorder} dsFont={dsFont} ds={ds} />
-          </div>
-        </div>
-        <span
-          style={{
-            fontFamily: editorialFonts.mono,
-            fontSize: "clamp(9px, 2cqw, 12px)",
-            color: ds.textDisabled,
-            letterSpacing: "-0.005em",
-          }}
-        >
-          {manifest.components.length} components
-        </span>
+            {previewComponent ? "Loads in view" : "No components"}
+          </span>
+        )}
       </div>
     </div>
-  );
-}
-
-function Chip({
-  label,
-  bg,
-  color,
-  border,
-  dsFont,
-  ds,
-}: {
-  label: string;
-  bg: string;
-  color: string;
-  border?: string;
-  dsFont: string;
-  ds: SlideProps["ds"];
-}) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "clamp(3px, 0.9cqw, 5px) clamp(8px, 2.2cqw, 12px)",
-        background: bg,
-        color,
-        border: border ? `1px solid ${border}` : "none",
-        borderRadius: 999,
-        fontFamily: dsFont,
-        fontSize: "clamp(9px, 2.2cqw, 12px)",
-        fontWeight: Number(ds.weightMedium),
-        letterSpacing: "-0.005em",
-        transition: "border-color 200ms ease-out, background 200ms ease-out",
-      }}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -998,26 +936,6 @@ function readableOn(bg: string): string {
   const b = parseInt(full.slice(4, 6), 16);
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return lum > 0.6 ? "#0B0F1C" : "#ffffff";
-}
-
-/* Inline icon — small, no external deps */
-function SearchIcon({ color = "currentColor" }: { color?: string } = {}) {
-  return (
-    <svg
-      width="1em"
-      height="1em"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ fontSize: "clamp(10px, 2.8cqw, 16px)" }}
-    >
-      <circle cx={11} cy={11} r={7} />
-      <path d="M20 20l-3.5-3.5" />
-    </svg>
-  );
 }
 
 /* ── Carousel ───────────────────────────────────────── */

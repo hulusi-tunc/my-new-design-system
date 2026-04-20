@@ -52,6 +52,14 @@ interface LiveComponentSandboxProps {
   examples?: SandboxExample[];
   /** Explicit mode. If `examples` is provided and mode is omitted, we use "gallery". */
   mode?: SandboxMode;
+  /**
+   * When provided (and length > 1), the sandbox bundles every listed component
+   * once and the generated App.tsx cycles through them on a setInterval inside
+   * the iframe — so the rotation is free after the one upfront bundle cost,
+   * instead of re-bundling per swap. Used by the overview card to show the DS
+   * reacting to multiple real components in rotation.
+   */
+  cycleComponents?: DSComponent[];
   /** Preview height — number is pixels, string can be e.g. "100%". Default 360. */
   height?: number | string;
   /**
@@ -137,23 +145,39 @@ function findByRole(
   return manifest.sourceLayout.files.find((f) => f.role === role)?.path;
 }
 
-/**
- * Skip globals.css — Sandpack's bundler can't handle Tailwind/PostCSS
- * directives, and inline-styled components render fine without it.
- */
-const SANDBOX_ROLES = ["tokens", "colorUtils", "themeProvider", "roleProvider"];
+const BASE_ROLES = ["tokens", "colorUtils", "themeProvider", "roleProvider"];
 
 /**
- * Given the manifest and the component being previewed, returns the list of
- * paths in the source repo that need to be fetched.
+ * CSS-variables design systems keep their styling in globals.css (CSS custom
+ * properties like `--blue-base`, `--radius-md`, etc). Skip it for inline-
+ * styled DSes since their globals.css usually contains Tailwind directives
+ * that Sandpack's bundler can't compile.
  */
-function buildFilePaths(manifest: DSManifest, component: DSComponent): string[] {
+function needsGlobalsCss(manifest: DSManifest): boolean {
+  return manifest.architecture === "css-variables";
+}
+
+/**
+ * Given the manifest and the components being previewed, returns the list of
+ * paths in the source repo that need to be fetched. Accepts multiple
+ * components so the carousel-mode sandbox can bundle several at once.
+ */
+function buildFilePaths(
+  manifest: DSManifest,
+  components: DSComponent[]
+): string[] {
   const paths: string[] = [];
   const layout = manifest.sourceLayout;
 
-  paths.push(`${layout.componentsDir}/${component.file}`);
+  for (const c of components) {
+    paths.push(`${layout.componentsDir}/${c.file}`);
+  }
 
-  for (const role of SANDBOX_ROLES) {
+  const roles = needsGlobalsCss(manifest)
+    ? [...BASE_ROLES, "globalsCss"]
+    : BASE_ROLES;
+
+  for (const role of roles) {
     const path = findByRole(manifest, role);
     if (path) paths.push(path);
   }
@@ -226,6 +250,8 @@ interface BuildOptions {
   exampleJsx?: string;
   examples?: SandboxExample[];
   displaySize: "sm" | "md" | "lg" | "xl";
+  /** When set, App.tsx cycles through these (in order) on a setInterval. */
+  cycleComponents?: DSComponent[];
 }
 
 function buildSandboxFiles(
@@ -253,29 +279,45 @@ function buildSandboxFiles(
   const layout = manifest.sourceLayout;
   // Compute paths without the leading "src/" now — everything lives at root
   const compDir = layout.componentsDir.replace(/^src\//, "");
-  const componentImportPath = `./${compDir}/${component.file.replace(/\.tsx?$/, "")}`;
 
-  const Comp = toPascalCase(component.name);
+  const buildImportPath = (c: DSComponent) =>
+    `./${compDir}/${c.file.replace(/\.tsx?$/, "")}`;
 
   const themeProviderPath = findByRole(manifest, "themeProvider");
   const themeProviderImport = themeProviderPath
     ? `./${themeProviderPath.replace(/^src\//, "").replace(/\.tsx?$/, "")}`
     : null;
 
+  // For CSS-variables systems (CESP), include globals.css so component styles
+  // backed by CSS custom properties actually render. Inline-styled systems
+  // (Octopus) skip it because their globals.css contains Tailwind directives
+  // the Sandpack bundler can't compile.
+  const globalsCssRepoPath = findByRole(manifest, "globalsCss");
+  const globalsCssSandboxPath =
+    needsGlobalsCss(manifest) && globalsCssRepoPath
+      ? `./${globalsCssRepoPath.replace(/^src\//, "")}`
+      : null;
+
+  const cycle = buildOpts.cycleComponents ?? [];
+  const primary: AppComponentEntry = {
+    name: toPascalCase(component.name),
+    importPath: buildImportPath(component),
+    exampleJsx: buildOpts.exampleJsx ?? defaultExampleCode(component.name),
+  };
+  const cycleEntries: AppComponentEntry[] = cycle.map((c) => ({
+    name: toPascalCase(c.name),
+    importPath: buildImportPath(c),
+    exampleJsx: defaultExampleCode(c.name),
+  }));
+
   const appTsx = buildAppEntry({
-    componentName: Comp,
-    componentImportPath,
+    primary,
+    cycle: cycleEntries.length > 1 ? cycleEntries : [],
     themeProviderImport,
-    exampleJsx: buildOpts.exampleJsx,
     examples: buildOpts.examples,
     mode: buildOpts.mode,
     displaySize: buildOpts.displaySize,
-    // We intentionally DON'T import the DS's globals.css — many design
-    // systems use Tailwind v4 or PostCSS features that Sandpack's bundler
-    // can't compile, which crashes the sandbox. Components using inline
-    // styles (like Octopus) render just fine without it.
-    hasGlobalsCss: false,
-    globalsCssPath: null,
+    globalsCssPath: globalsCssSandboxPath,
   });
 
   // Sandpack's react-ts template provides its own /index.tsx that imports
@@ -298,18 +340,31 @@ function buildDependencies(_manifest: DSManifest): Record<string, string> {
   };
 }
 
+interface AppComponentEntry {
+  /** Component identifier, PascalCase (e.g. "Button") */
+  name: string;
+  /** Import path inside the sandbox, without extension (e.g. "./components/ui/Button") */
+  importPath: string;
+  /** JSX snippet that instantiates the component (e.g. '<Button variant="primary">…</Button>') */
+  exampleJsx: string;
+}
+
 interface AppEntryOptions {
-  componentName: string;
-  componentImportPath: string;
+  /** The component shown first (and the only one, if cycle is empty). */
+  primary: AppComponentEntry;
+  /**
+   * If non-empty, App.tsx renders this rotation on a 2s interval inside the
+   * iframe. Must include at least two entries to be a cycle; otherwise the
+   * single `primary` is rendered.
+   */
+  cycle: AppComponentEntry[];
   themeProviderImport: string | null;
-  /** Used when mode === "single" */
-  exampleJsx?: string;
   /** Used when mode === "gallery" */
   examples?: SandboxExample[];
   mode: SandboxMode;
   /** Inferred displaySize used to choose horizontal vs vertical gallery layout */
   displaySize: "sm" | "md" | "lg" | "xl";
-  hasGlobalsCss: boolean;
+  /** Import specifier (with leading "./") for the DS's globals.css, or null to skip. */
   globalsCssPath: string | null;
 }
 
@@ -321,29 +376,60 @@ function escapeBackticks(s: string): string {
 }
 
 function buildAppEntry(opts: AppEntryOptions): string {
+  const hasCycle = opts.cycle.length > 1;
+  const allEntries: AppComponentEntry[] = hasCycle
+    ? opts.cycle
+    : [opts.primary];
+
+  // Deduplicate imports by component name (the DS might declare the same
+  // component twice under different variant names — we only need one import).
+  const seenNames = new Set<string>();
   const imports: string[] = [];
+  for (const entry of allEntries) {
+    if (seenNames.has(entry.name)) continue;
+    seenNames.add(entry.name);
+    imports.push(`import { ${entry.name} } from "${entry.importPath}";`);
+  }
+
   const wrapperOpen: string[] = [];
   const wrapperClose: string[] = [];
-
-  imports.push(`import { ${opts.componentName} } from "${opts.componentImportPath}";`);
-
   if (opts.themeProviderImport) {
-    imports.push(
+    imports.unshift(
       `import { ThemeProvider } from "${opts.themeProviderImport}";`
     );
     wrapperOpen.push("<ThemeProvider>");
     wrapperClose.unshift("</ThemeProvider>");
   }
 
-  if (opts.hasGlobalsCss && opts.globalsCssPath) {
-    imports.push(`import "${opts.globalsCssPath}";`);
+  if (opts.globalsCssPath) {
+    imports.unshift(`import "${opts.globalsCssPath}";`);
   }
 
-  const stageCore =
-    opts.mode === "gallery" && opts.examples && opts.examples.length > 0
-      ? buildGalleryStage(opts.examples, opts.displaySize)
-      : buildSingleStage(opts.exampleJsx ?? `<${opts.componentName} />`);
+  // Gallery mode — multiple labelled examples laid out in a grid/stack. Cycle
+  // mode wins over gallery if both are enabled (cycle is the newer pattern).
+  if (!hasCycle && opts.mode === "gallery" && opts.examples && opts.examples.length > 0) {
+    const stage = buildGalleryStage(opts.examples, opts.displaySize);
+    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+  }
 
+  // Cycle mode — internal setInterval rotates the active snippet every 2s.
+  if (hasCycle) {
+    imports.unshift(`import { useEffect, useState } from "react";`);
+    const stage = buildCycleStage(opts.cycle);
+    return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+  }
+
+  // Single snippet — the default, used by most previews.
+  const stage = buildSingleStage(opts.primary.exampleJsx);
+  return renderAppWrapper(imports, wrapperOpen, wrapperClose, stage);
+}
+
+function renderAppWrapper(
+  imports: string[],
+  wrapperOpen: string[],
+  wrapperClose: string[],
+  stageCore: string
+): string {
   return `${imports.join("\n")}
 
 export default function App() {
@@ -360,6 +446,65 @@ export default function App() {
   );
 }
 `;
+}
+
+/**
+ * Generates the JSX for the cycle stage. The outer div is fixed to the
+ * iframe viewport, an inner fragment swaps the active component every 2s
+ * via setInterval. We render the snippet as literal JSX (not a string eval)
+ * so the DS's real component functions mount, not serialised markup.
+ */
+function buildCycleStage(entries: AppComponentEntry[]): string {
+  // Each entry becomes one JSX case inside a `switch` by index. The default
+  // case returns null so a misalignment never crashes the preview.
+  const cases = entries
+    .map(
+      (entry, i) => `        case ${i}: return (${entry.exampleJsx});`
+    )
+    .join("\n");
+
+  return `(() => {
+    const [index, setIndex] = useState(0);
+    useEffect(() => {
+      const id = setInterval(
+        () => setIndex((i) => (i + 1) % ${entries.length}),
+        2000
+      );
+      return () => clearInterval(id);
+    }, []);
+    const active = (() => {
+      switch (index) {
+${cases}
+        default: return null;
+      }
+    })();
+    return (
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        transition: "opacity 180ms ease-out",
+      }}>
+        <div
+          key={index}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "hubera-cycle-in 220ms ease-out both",
+          }}
+        >
+          {active}
+        </div>
+        <style>{\`@keyframes hubera-cycle-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }\`}</style>
+      </div>
+    );
+  })()`;
 }
 
 function buildSingleStage(jsx: string): string {
@@ -447,6 +592,7 @@ export function LiveComponentSandbox({
   exampleCode,
   examples,
   mode,
+  cycleComponents,
   height = 360,
   bare = false,
 }: LiveComponentSandboxProps) {
@@ -474,7 +620,18 @@ export function LiveComponentSandbox({
     let cancelled = false;
     setState({ status: "loading" });
 
-    const paths = buildFilePaths(manifest, component);
+    // Fetch the primary component plus (if set) every cycle component, with
+    // the primary first so the required-file check below hits a stable path.
+    const targetComponents = [component, ...(cycleComponents ?? [])];
+    // De-dupe by file so we don't fetch the same file twice.
+    const seen = new Set<string>();
+    const uniqueTargets = targetComponents.filter((c) => {
+      if (seen.has(c.file)) return false;
+      seen.add(c.file);
+      return true;
+    });
+
+    const paths = buildFilePaths(manifest, uniqueTargets);
     if (paths.length === 0) {
       setState({
         status: "error",
@@ -498,7 +655,7 @@ export function LiveComponentSandbox({
       .then((data: { files: Record<string, string>; errors?: Record<string, string> }) => {
         if (cancelled) return;
 
-        // The component file itself is required
+        // The primary component file is required
         const componentPath = `${manifest.sourceLayout.componentsDir}/${component.file}`;
 
         if (!data.files[componentPath]) {
@@ -511,12 +668,19 @@ export function LiveComponentSandbox({
           return;
         }
 
+        // Cycle components that actually fetched successfully
+        const availableCycle = (cycleComponents ?? []).filter((c) => {
+          const p = `${manifest.sourceLayout.componentsDir}/${c.file}`;
+          return Boolean(data.files[p]);
+        });
+
         const jsx = exampleCode ?? defaultExampleCode(component.name);
         const sandboxFiles = buildSandboxFiles(data.files, manifest, component, {
           mode: effectiveMode,
           exampleJsx: jsx,
           examples,
           displaySize,
+          cycleComponents: availableCycle,
         });
         setState({ status: "ready", files: sandboxFiles });
       })
@@ -531,7 +695,7 @@ export function LiveComponentSandbox({
     return () => {
       cancelled = true;
     };
-  }, [manifest, component, exampleCode, examples, effectiveMode, displaySize]);
+  }, [manifest, component, exampleCode, examples, effectiveMode, displaySize, cycleComponents]);
 
   /* ── styles ──────────────────────────────── */
 

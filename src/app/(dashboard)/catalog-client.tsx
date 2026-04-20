@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, type CSSProperties } from "react"
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { DSCard } from "@/components/registry/ds-card";
-import { PrimaryPill } from "@/components/editorial";
+import { Button, Badge, EmptyState as HubEmptyState } from "@/components/hub";
 import { getCategoryMeta, type PlatformCategory } from "@/lib/platforms";
 import type { DSManifest } from "@/lib/types";
 
@@ -182,24 +182,6 @@ export function CatalogClient({ category, systems }: CatalogClientProps) {
     gap: 10,
   };
 
-  const filterButtonStyle: CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    background: filterPanelOpen ? t.surfaceRaised : "transparent",
-    border: `1px solid ${filterPanelOpen ? t.textDisplay : t.borderVisible}`,
-    borderRadius: 9999,
-    padding: "10px 18px",
-    fontFamily: editorialFonts.body,
-    fontSize: 14,
-    fontWeight: 500,
-    lineHeight: 1,
-    color: t.textDisplay,
-    cursor: "pointer",
-    transition:
-      "background 200ms cubic-bezier(0.165, 0.84, 0.44, 1), border-color 200ms cubic-bezier(0.165, 0.84, 0.44, 1)",
-  };
-
   /* ── render ──────────────────────────── */
 
   return (
@@ -241,41 +223,32 @@ export function CatalogClient({ category, systems }: CatalogClientProps) {
 
         {/* Right actions: Filter button + Submit */}
         <div style={rightActionsStyle}>
-          <button
-            ref={filterButtonRef}
-            type="button"
-            onClick={() => setFilterPanelOpen((v) => !v)}
-            style={filterButtonStyle}
-          >
-            <Filter3LineIcon size={14} color={t.textPrimary} />
-            Filter
-            {activeCount > 0 && (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 18,
-                  height: 18,
-                  padding: "0 5px",
-                  borderRadius: swatchRadii.full,
-                  background: t.accent,
-                  color: t.accentFg,
-                  fontFamily: editorialFonts.mono,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  lineHeight: 1,
-                }}
-              >
-                {activeCount}
-              </span>
-            )}
-          </button>
+          <span ref={filterButtonRef} style={{ display: "inline-flex" }}>
+            <Button
+              variant="secondary"
+              size="md"
+              leadingIcon={<Filter3LineIcon size={14} />}
+              trailingIcon={
+                activeCount > 0 ? (
+                  <Badge tone="accent" variant="solid" size="sm">
+                    {activeCount}
+                  </Badge>
+                ) : undefined
+              }
+              onClick={() => setFilterPanelOpen((v) => !v)}
+            >
+              Filter
+            </Button>
+          </span>
 
-          <PrimaryPill href="/submit" trailingArrow={false}>
-            <AddLineIcon size={14} />
+          <Button
+            variant="primary"
+            size="md"
+            href="/ingest/new"
+            leadingIcon={<AddLineIcon size={14} />}
+          >
             Submit system
-          </PrimaryPill>
+          </Button>
         </div>
 
         {/* Filter panel */}
@@ -547,7 +520,6 @@ function EmptyState({
   hasAnySystems,
   hasActiveFilters,
   onClearFilters,
-  t,
 }: {
   platformLabel: string;
   hasAnySystems: boolean;
@@ -555,96 +527,31 @@ function EmptyState({
   onClearFilters: () => void;
   t: ReturnType<typeof getNd>;
 }) {
-  // Two shapes: (1) platform has zero systems — invite submission,
-  // (2) filters exclude everything — invite clearing.
   if (hasAnySystems && hasActiveFilters) {
     return (
-      <div
-        style={{
-          padding: "60px 0",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 10,
-          fontFamily: editorialFonts.body,
-          color: t.textSecondary,
-        }}
-      >
-        <span style={{ fontSize: 14 }}>No systems match your filters</span>
-        <button
-          type="button"
-          onClick={onClearFilters}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: t.textDisplay,
-            fontFamily: editorialFonts.body,
-            fontSize: 13,
-            textDecoration: "underline",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          Clear filters
-        </button>
-      </div>
+      <HubEmptyState
+        title="No systems match your filters"
+        action={
+          <Button variant="ghost" size="sm" onClick={onClearFilters}>
+            Clear filters
+          </Button>
+        }
+        padY={8}
+      />
     );
   }
 
   return (
-    <div
-      style={{
-        padding: "80px 24px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-        fontFamily: editorialFonts.body,
-        textAlign: "center",
-        color: t.textSecondary,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: editorialFonts.mono,
-          fontSize: 10,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: t.textDisabled,
-        }}
-      >
-        {platformLabel}
-      </span>
-      <h2
-        style={{
-          margin: 0,
-          fontFamily: editorialFonts.display,
-          fontSize: 26,
-          fontWeight: 500,
-          lineHeight: 1.15,
-          color: t.textDisplay,
-          maxWidth: 520,
-        }}
-      >
-        No design systems for this platform yet
-      </h2>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 14,
-          lineHeight: 1.55,
-          maxWidth: 440,
-        }}
-      >
-        Be the first to publish one — fork an existing system or submit a repo
-        and we&apos;ll extract the tokens and components for you.
-      </p>
-      <div style={{ display: "inline-flex", gap: 10, marginTop: 6 }}>
-        <PrimaryPill href="/submit" trailingArrow={false}>
+    <HubEmptyState
+      eyebrow={platformLabel}
+      title="No design systems for this platform yet"
+      description="Be the first to publish one — fork an existing system or submit a repo and we'll extract the tokens and components for you."
+      action={
+        <Button variant="primary" size="md" href="/ingest/new">
           Submit a system
-        </PrimaryPill>
-      </div>
-    </div>
+        </Button>
+      }
+    />
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, type CSSProperties } from "react";
+import { useState, useMemo, useEffect, type CSSProperties } from "react";
 import Link from "next/link";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts } from "@/lib/nothing-tokens";
@@ -52,9 +52,8 @@ export function DetailClient({
   };
 
   const containerStyle: CSSProperties = {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "0 32px",
+    width: "100%",
+    padding: "0 40px",
   };
 
   return (
@@ -65,7 +64,6 @@ export function DetailClient({
         <DSHero
           manifest={manifest}
           parentManifest={parentManifest}
-          forksCount={forks.length}
           t={t}
         />
       </div>
@@ -122,18 +120,17 @@ export function DetailClient({
 function DSHero({
   manifest,
   parentManifest,
-  forksCount,
   t,
 }: {
   manifest: DSManifest;
   parentManifest: DSManifest | null;
-  forksCount: number;
   t: ReturnType<typeof getNd>;
 }) {
   const [saved, setSaved] = useState(false);
-  const [forkHovered, setForkHovered] = useState(false);
+  const [useHovered, setUseHovered] = useState(false);
   const [savedHovered, setSavedHovered] = useState(false);
   const [moreHovered, setMoreHovered] = useState(false);
+  const [useModalOpen, setUseModalOpen] = useState(false);
 
   // Resolve the DS's own brand color for the icon square
   const ds = useMemo(
@@ -148,10 +145,10 @@ function DSHero({
 
   const wrapStyle: CSSProperties = {
     display: "flex",
+    flexDirection: "column",
     alignItems: "flex-start",
     gap: 24,
     padding: "8px 0 40px",
-    flexWrap: "wrap",
   };
 
   const iconStyle: CSSProperties = {
@@ -176,14 +173,14 @@ function DSHero({
     flexDirection: "column",
     gap: 16,
     minWidth: 0,
-    flex: 1,
+    width: "100%",
   };
 
   const titleStyle: CSSProperties = {
     fontFamily: editorialFonts.body,
-    fontSize: "clamp(28px, 3.8vw, 42px)",
+    fontSize: "clamp(32px, 4.4vw, 52px)",
     fontWeight: 700,
-    lineHeight: 1.1,
+    lineHeight: 1.05,
     letterSpacing: "-0.025em",
     color: t.textDisplay,
     margin: 0,
@@ -192,14 +189,15 @@ function DSHero({
   const emDashStyle: CSSProperties = {
     color: t.textDisabled,
     fontWeight: 400,
-    margin: "0 8px",
+    marginLeft: 8,
   };
 
   const taglineStyle: CSSProperties = {
+    display: "block",
     fontFamily: editorialFonts.body,
-    fontSize: "clamp(28px, 3.8vw, 42px)",
+    fontSize: "clamp(32px, 4.4vw, 52px)",
     fontWeight: 400,
-    lineHeight: 1.1,
+    lineHeight: 1.05,
     letterSpacing: "-0.025em",
     color: t.textPrimary,
   };
@@ -256,20 +254,19 @@ function DSHero({
     transition: "opacity 120ms ease-out",
   };
 
-  const secondaryActionStyle: CSSProperties = {
+  const useActionStyle: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
     padding: "9px 18px",
     borderRadius: 999,
     border: `1px solid ${t.borderVisible}`,
-    background: forkHovered ? t.surface : "transparent",
+    background: useHovered ? t.surface : "transparent",
     color: t.textDisplay,
     fontFamily: editorialFonts.body,
     fontSize: 13,
     fontWeight: 500,
     cursor: "pointer",
-    textDecoration: "none",
     transition: "background 120ms ease-out",
   };
 
@@ -296,6 +293,7 @@ function DSHero({
   /* ── Render ──────────────────────────────────── */
 
   return (
+    <>
     <div style={wrapStyle}>
       <div style={iconStyle}>{initial}</div>
 
@@ -319,7 +317,7 @@ function DSHero({
           </Link>
         )}
 
-        {/* Title — name + em dash + tagline */}
+        {/* Title — name — on line 1, tagline on line 2 */}
         <h1 style={titleStyle}>
           {manifest.name}
           <span style={emDashStyle}>—</span>
@@ -346,18 +344,6 @@ function DSHero({
               {manifest.architecture.replace(/-/g, " ")}
             </span>
           </div>
-
-          <div style={metaItemStyle}>
-            <span style={metaLabelStyle}>Components</span>
-            <span style={metaValueStyle}>{manifest.components.length}</span>
-          </div>
-
-          {forksCount > 0 && (
-            <div style={metaItemStyle}>
-              <span style={metaLabelStyle}>Forks</span>
-              <span style={metaValueStyle}>{forksCount}</span>
-            </div>
-          )}
         </div>
 
         {/* Action buttons */}
@@ -373,17 +359,16 @@ function DSHero({
             {saved ? "Saved" : "Save"}
           </button>
 
-          <a
-            href={manifest.repository}
-            target="_blank"
-            rel="noopener noreferrer"
-            onMouseEnter={() => setForkHovered(true)}
-            onMouseLeave={() => setForkHovered(false)}
-            style={secondaryActionStyle}
+          <button
+            type="button"
+            onClick={() => setUseModalOpen(true)}
+            onMouseEnter={() => setUseHovered(true)}
+            onMouseLeave={() => setUseHovered(false)}
+            style={useActionStyle}
           >
-            <GithubInlineIcon />
-            View on GitHub
-          </a>
+            <DownloadInlineIcon />
+            Use design system
+          </button>
 
           <button
             type="button"
@@ -397,6 +382,274 @@ function DSHero({
         </div>
       </div>
     </div>
+
+    {useModalOpen && (
+      <UseDSModal
+        manifest={manifest}
+        onClose={() => setUseModalOpen(false)}
+        t={t}
+      />
+    )}
+    </>
+  );
+}
+
+/* ── Use-design-system modal ───────────────────── */
+
+function UseDSModal({
+  manifest,
+  onClose,
+  t,
+}: {
+  manifest: DSManifest;
+  onClose: () => void;
+  t: ReturnType<typeof getNd>;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const prompt = `Install the "${manifest.slug}" design system from Hubera`;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Use ${manifest.name}`}
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 80,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 560,
+          background: t.surface,
+          border: `1px solid ${t.border}`,
+          borderRadius: 20,
+          padding: 32,
+          display: "flex",
+          flexDirection: "column",
+          gap: 24,
+          boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+        }}
+      >
+        <header style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span
+            style={{
+              fontFamily: editorialFonts.mono,
+              fontSize: 11,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: t.textDisabled,
+            }}
+          >
+            Import
+          </span>
+          <h2
+            style={{
+              margin: 0,
+              fontFamily: editorialFonts.body,
+              fontSize: 24,
+              fontWeight: 600,
+              letterSpacing: "-0.02em",
+              color: t.textDisplay,
+              lineHeight: 1.15,
+            }}
+          >
+            Use {manifest.name}
+          </h2>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: editorialFonts.body,
+              fontSize: 14,
+              lineHeight: 1.55,
+              color: t.textSecondary,
+            }}
+          >
+            Paste the prompt below into Claude Code, or clone the repository
+            directly.
+          </p>
+        </header>
+
+        <Step index="01" label="Prompt Claude Code" t={t}>
+          <ModalCopy text={prompt} t={t} />
+        </Step>
+
+        <Step index="02" label="Or clone from GitHub" t={t}>
+          <ModalCopy text={manifest.repository} t={t} mono />
+        </Step>
+
+        <footer
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            paddingTop: 8,
+            borderTop: `1px solid ${t.border}`,
+          }}
+        >
+          <a
+            href={manifest.repository}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: editorialFonts.mono,
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: t.textSecondary,
+              textDecoration: "none",
+            }}
+          >
+            Open on GitHub ↗
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: 0,
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: editorialFonts.mono,
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: t.textDisabled,
+            }}
+          >
+            Close
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function Step({
+  index,
+  label,
+  children,
+  t,
+}: {
+  index: string;
+  label: string;
+  children: React.ReactNode;
+  t: ReturnType<typeof getNd>;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: editorialFonts.mono,
+          fontSize: 11,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        <span style={{ color: t.textDisabled }}>{index}</span>
+        <span style={{ color: t.textPrimary }}>{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ModalCopy({
+  text,
+  t,
+  mono = false,
+}: {
+  text: string;
+  t: ReturnType<typeof getNd>;
+  mono?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // noop
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        padding: "12px 16px",
+        background: t.surfaceInk,
+        border: `1px solid ${hovered ? t.borderVisible : t.border}`,
+        borderRadius: 12,
+        fontFamily: mono ? editorialFonts.mono : editorialFonts.body,
+        fontSize: 13,
+        color: t.textPrimary,
+        cursor: "pointer",
+        transition: "border-color 120ms ease-out",
+        textAlign: "left",
+        width: "100%",
+      }}
+    >
+      <span
+        style={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {text}
+      </span>
+      <span
+        style={{
+          fontFamily: editorialFonts.mono,
+          fontSize: 10,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: copied ? t.accent : t.textDisabled,
+          flexShrink: 0,
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </span>
+    </button>
   );
 }
 
@@ -410,20 +663,31 @@ function BookmarkInlineIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function GithubInlineIcon() {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-    </svg>
-  );
-}
-
 function MoreInlineIcon() {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
       <circle cx="12" cy="5" r="1.6" />
       <circle cx="12" cy="12" r="1.6" />
       <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  );
+}
+
+function DownloadInlineIcon() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
     </svg>
   );
 }

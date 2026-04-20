@@ -5,12 +5,21 @@
 
 -- ── Profiles (mirrors auth.users with public-facing fields) ──
 
+do $$ begin
+  create type public.approval_status as enum ('pending', 'approved', 'rejected');
+exception when duplicate_object then null;
+end $$;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  github_username text unique not null,
+  github_username text unique,
   display_name text,
+  full_name text,
   avatar_url text,
   bio text,
+  approval_status public.approval_status not null default 'pending',
+  approved_at timestamptz,
+  approved_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz default now()
 );
 
@@ -132,6 +141,18 @@ drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update using (auth.uid() = id);
 
+-- Admin can update any profile (used for approve/reject)
+drop policy if exists "Admin can update approval status" on public.profiles;
+create policy "Admin can update approval status"
+  on public.profiles for update
+  using (
+    exists (
+      select 1 from auth.users u
+      where u.id = auth.uid()
+        and lower(u.email) = 'hulusitunc1@gmail.com'
+    )
+  );
+
 -- Design systems: public read if published, owner full access
 drop policy if exists "Published design systems are viewable by everyone"
   on public.design_systems;
@@ -161,16 +182,30 @@ create policy "Stats are viewable by everyone"
 
 -- ── Triggers ──
 
--- Auto-create profile on user signup
+-- Auto-create profile on user signup.
+-- Admin email is auto-approved; everyone else starts pending.
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, github_username, display_name, avatar_url)
+  insert into public.profiles (
+    id,
+    github_username,
+    display_name,
+    full_name,
+    avatar_url,
+    approval_status
+  )
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'user_name', new.raw_user_meta_data->>'preferred_username'),
     coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
-    new.raw_user_meta_data->>'avatar_url'
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'avatar_url',
+    case
+      when lower(new.email) = 'hulusitunc1@gmail.com'
+        then 'approved'::public.approval_status
+      else 'pending'::public.approval_status
+    end
   )
   on conflict (id) do nothing;
   return new;

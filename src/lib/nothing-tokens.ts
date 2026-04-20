@@ -124,3 +124,211 @@ export const swatchRadii = {
   xl: 12,
   full: 9999,
 } as const;
+
+/* ── Motion ──────────────────────────────────────── */
+
+/**
+ * Two tiers. Chrome = dashboard UI widgets (color/bg only, snappy).
+ * Hero = CTAs, cards, primary actions (adds a gentle lift + softer easing).
+ * No other timings should be invented at call sites.
+ */
+export const motion = {
+  duration: {
+    instant: "0ms",
+    chrome: "120ms",
+    hero: "220ms",
+    slow: "400ms",
+  },
+  easing: {
+    out: "cubic-bezier(0.2, 0.8, 0.2, 1)",        // chrome default
+    outQuart: "cubic-bezier(0.165, 0.84, 0.44, 1)", // hero default
+    inOut: "cubic-bezier(0.4, 0, 0.2, 1)",
+    linear: "linear",
+  },
+  transition: {
+    chrome: "120ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+    hero: "220ms cubic-bezier(0.165, 0.84, 0.44, 1)",
+  },
+} as const;
+
+/* ── Spacing ─────────────────────────────────────── */
+
+/**
+ * 4px base unit. Prefer these over magic numbers.
+ *   sp(0) = 0, sp(1) = 4, sp(2) = 8, ... sp(16) = 64
+ * Ergonomic helper: `space[2]` returns `8`.
+ */
+export const space = {
+  0: 0,
+  0.5: 2,
+  1: 4,
+  1.5: 6,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
+  10: 40,
+  12: 48,
+  14: 56,
+  16: 64,
+  20: 80,
+  24: 96,
+} as const;
+export type SpaceKey = keyof typeof space;
+
+/* ── Typography ──────────────────────────────────── */
+
+export interface TypeStyle {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  fontWeight: number;
+  letterSpacing: string;
+  textTransform?: "none" | "uppercase";
+}
+
+export const type = {
+  // Display — marketing/hero headlines
+  display1: {
+    fontFamily: editorialFonts.display,
+    fontSize: 56,
+    lineHeight: 1.05,
+    fontWeight: 500,
+    letterSpacing: "-0.02em",
+  } satisfies TypeStyle,
+  display2: {
+    fontFamily: editorialFonts.display,
+    fontSize: 42,
+    lineHeight: 1.1,
+    fontWeight: 500,
+    letterSpacing: "-0.02em",
+  } satisfies TypeStyle,
+  display3: {
+    fontFamily: editorialFonts.display,
+    fontSize: 32,
+    lineHeight: 1.15,
+    fontWeight: 500,
+    letterSpacing: "-0.015em",
+  } satisfies TypeStyle,
+  display4: {
+    fontFamily: editorialFonts.display,
+    fontSize: 24,
+    lineHeight: 1.2,
+    fontWeight: 500,
+    letterSpacing: "-0.01em",
+  } satisfies TypeStyle,
+  display5: {
+    fontFamily: editorialFonts.display,
+    fontSize: 18,
+    lineHeight: 1.3,
+    fontWeight: 600,
+    letterSpacing: "-0.005em",
+  } satisfies TypeStyle,
+
+  // Body
+  bodyLg: {
+    fontFamily: editorialFonts.body,
+    fontSize: 16,
+    lineHeight: 1.55,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+  bodyMd: {
+    fontFamily: editorialFonts.body,
+    fontSize: 14,
+    lineHeight: 1.55,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+  bodySm: {
+    fontFamily: editorialFonts.body,
+    fontSize: 13,
+    lineHeight: 1.5,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+  bodyXs: {
+    fontFamily: editorialFonts.body,
+    fontSize: 12,
+    lineHeight: 1.5,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+
+  // Mono — code, file paths, terminal commands
+  monoMd: {
+    fontFamily: editorialFonts.mono,
+    fontSize: 13,
+    lineHeight: 1.55,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+  monoSm: {
+    fontFamily: editorialFonts.mono,
+    fontSize: 12,
+    lineHeight: 1.5,
+    fontWeight: 400,
+    letterSpacing: "0",
+  } satisfies TypeStyle,
+
+  // Label — eyebrows, tabs, small caps metadata
+  label: {
+    fontFamily: editorialFonts.mono,
+    fontSize: 11,
+    lineHeight: 1.2,
+    fontWeight: 400,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  } satisfies TypeStyle,
+  labelSm: {
+    fontFamily: editorialFonts.mono,
+    fontSize: 10,
+    lineHeight: 1.2,
+    fontWeight: 500,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  } satisfies TypeStyle,
+} as const;
+export type TypeKey = keyof typeof type;
+
+/**
+ * Spread into a style object: `style={{ ...applyType("bodyMd"), color: t.textPrimary }}`.
+ */
+export function applyType(key: TypeKey): React.CSSProperties {
+  return type[key] as React.CSSProperties;
+}
+
+/* ── Shadows ─────────────────────────────────────── */
+
+export const shadow = {
+  dark: {
+    none: "none",
+    low: "0 1px 0 rgba(255,255,255,0.04) inset, 0 2px 6px rgba(0,0,0,0.22)",
+    medium: "0 2px 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.36)",
+    high: "0 4px 0 rgba(255,255,255,0.04) inset, 0 18px 54px rgba(0,0,0,0.52)",
+    focus: "0 0 0 3px oklch(0.6 0.21 254 / 0.35)",
+  },
+  light: {
+    none: "none",
+    low: "0 1px 2px rgba(15,15,20,0.06)",
+    medium: "0 1px 0 rgba(255,255,255,0.6) inset, 0 6px 18px rgba(15,15,20,0.08)",
+    high: "0 1px 0 rgba(255,255,255,0.8) inset, 0 18px 48px rgba(15,15,20,0.14)",
+    focus: "0 0 0 3px oklch(0.5 0.22 254 / 0.25)",
+  },
+} as const;
+export function getShadow(theme: string) {
+  return theme === "dark" ? shadow.dark : shadow.light;
+}
+
+/* ── Z-index layers ──────────────────────────────── */
+
+export const zLayer = {
+  base: 1,
+  dropdown: 30,
+  nav: 50,
+  popover: 60,
+  modal: 80,
+  toast: 100,
+} as const;

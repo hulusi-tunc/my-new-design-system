@@ -7,6 +7,7 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { HuberaLogo } from "@/components/brand/hubera-logo";
 import { createClient } from "@/lib/supabase/client";
+import { isAdminEmail } from "@/lib/auth/admin";
 import type { User } from "@supabase/supabase-js";
 import { DesignSystemsNav } from "@/components/design-systems-nav";
 import { useCurrentCategory } from "@/lib/use-current-category";
@@ -289,6 +290,15 @@ export function DSTopNav() {
             color={t.textSecondary}
             hoverColor={t.textDisplay}
           />
+          {isAdminEmail(user?.email) ? (
+            <NavLink
+              href="/admin"
+              label="Admin"
+              active={isActive("/admin")}
+              color={t.textSecondary}
+              hoverColor={t.textDisplay}
+            />
+          ) : null}
         </div>
       </div>
 

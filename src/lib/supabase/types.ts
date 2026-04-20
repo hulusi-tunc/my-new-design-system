@@ -29,26 +29,38 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
-          github_username: string;
+          github_username: string | null;
           display_name: string | null;
+          full_name: string | null;
           avatar_url: string | null;
           bio: string | null;
+          approval_status: "pending" | "approved" | "rejected";
+          approved_at: string | null;
+          approved_by: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
-          github_username: string;
+          github_username?: string | null;
           display_name?: string | null;
+          full_name?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
+          approval_status?: "pending" | "approved" | "rejected";
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          github_username?: string;
+          github_username?: string | null;
           display_name?: string | null;
+          full_name?: string | null;
           avatar_url?: string | null;
           bio?: string | null;
+          approval_status?: "pending" | "approved" | "rejected";
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
         };
         Relationships: NoRelationships;

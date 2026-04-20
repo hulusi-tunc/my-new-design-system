@@ -129,7 +129,13 @@ function defaultExampleCode(name: string): string {
     return `<${Comp}>design</${Comp}>`;
   }
   if (/tabs/.test(n)) {
-    return `<${Comp} tabs={[{label: "Overview", id: "ov"}, {label: "Tokens", id: "tk"}]} defaultTab="ov" />`;
+    // Hubera-style Tabs is controlled (items + value + onChange). Octopus
+    // ships its own examples in the manifest so this default only runs for
+    // auto-extracted manifests.
+    return `{(() => {
+      const [v, setV] = React.useState("ov");
+      return <${Comp} items={[{id:"ov",label:"Overview"},{id:"tk",label:"Tokens"}]} value={v} onChange={setV} />;
+    })()}`;
   }
   if (/card/.test(n)) {
     return `<${Comp} title="Card title">A short description inside the card.</${Comp}>`;
@@ -246,6 +252,69 @@ function buildFilePaths(
   }
 
   return paths;
+}
+
+/* ── Import crawler ──────────────────────────────── */
+
+const ALIAS_IMPORT_RE =
+  /(?:from|import)\s+["']@\/([^"']+)["']/g;
+
+const SOURCE_EXT_RE = /\.(tsx?|jsx?|mjs|cjs)$/;
+
+/**
+ * Given a set of already-fetched files, scan their contents for `@/...`
+ * imports and request any sibling files we haven't fetched yet. Repeats
+ * up to `maxHops` times so transitive deps (icons → utils → constants)
+ * resolve. The ds-source endpoint silently 404s on missing paths so we
+ * can speculatively try `.tsx`, `.ts`, and `/index.ts` variants per import.
+ */
+async function crawlAliasImports(
+  initial: Record<string, string>,
+  fetchPaths: (
+    paths: string[]
+  ) => Promise<{ files: Record<string, string>; errors?: Record<string, string> }>,
+  maxHops: number
+): Promise<{ files: Record<string, string>; errors?: Record<string, string> }> {
+  const merged: Record<string, string> = { ...initial };
+  const tried = new Set<string>(Object.keys(merged));
+
+  for (let hop = 0; hop < maxHops; hop++) {
+    const candidates = new Set<string>();
+    for (const [, content] of Object.entries(merged)) {
+      if (typeof content !== "string") continue;
+      if (!SOURCE_EXT_RE.test("dummy.tsx") /* type guard */) continue;
+
+      ALIAS_IMPORT_RE.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = ALIAS_IMPORT_RE.exec(content)) !== null) {
+        const importPath = m[1];
+        // Try a small set of likely on-disk paths for each import.
+        const variants = [
+          `src/${importPath}.tsx`,
+          `src/${importPath}.ts`,
+          `src/${importPath}.jsx`,
+          `src/${importPath}.js`,
+          `src/${importPath}/index.tsx`,
+          `src/${importPath}/index.ts`,
+        ];
+        for (const v of variants) {
+          if (!tried.has(v)) candidates.add(v);
+        }
+      }
+    }
+
+    if (candidates.size === 0) break;
+
+    const batch = Array.from(candidates);
+    batch.forEach((p) => tried.add(p));
+
+    const result = await fetchPaths(batch);
+    for (const [path, content] of Object.entries(result.files)) {
+      if (!merged[path]) merged[path] = content;
+    }
+  }
+
+  return { files: merged };
 }
 
 /* ── Build sandbox files ─────────────────────────── */
@@ -624,12 +693,15 @@ function renderAppWrapper(
   stageCore: string,
   needsTailwindCdn: boolean
 ): string {
-  // Always include React hooks for the theme-sync effect below; dedupe with
-  // any existing useEffect/useState imports from cycle mode.
-  if (!imports.some((l) => l.includes('from "react"'))) {
-    imports.unshift(`import { useEffect } from "react";`);
-  } else if (!imports.some((l) => /useEffect/.test(l))) {
-    imports.unshift(`import { useEffect } from "react";`);
+  // Always include React + the common hooks. The theme-sync effect uses
+  // useEffect; some defaultExampleCode patterns (e.g. controlled Tabs) use
+  // useState. Importing the namespace lets snippets do `React.useState(...)`
+  // too. Dedupe with any cycle-mode imports.
+  if (!imports.some((l) => /^import \* as React/.test(l))) {
+    imports.unshift(`import * as React from "react";`);
+  }
+  if (!imports.some((l) => /useEffect/.test(l) && /useState/.test(l))) {
+    imports.unshift(`import { useEffect, useState } from "react";`);
   }
 
   // When the DS relies on Tailwind classes (e.g. CESP's `bg-[var(--primary-base)]`),
@@ -951,20 +1023,38 @@ export function LiveComponentSandbox({
       return;
     }
 
-    fetch(`/api/ds-source/${manifest.slug}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Fetch failed: ${res.status} ${errorText}`);
-        }
-        return res.json();
-      })
-      .then((data: { files: Record<string, string>; errors?: Record<string, string> }) => {
+    const fetchPaths = async (
+      pathList: string[]
+    ): Promise<{ files: Record<string, string>; errors?: Record<string, string> }> => {
+      const res = await fetch(`/api/ds-source/${manifest.slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: pathList }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Fetch failed: ${res.status} ${errorText}`);
+      }
+      return res.json();
+    };
+
+    (async () => {
+      try {
+        const initial = await fetchPaths(paths);
         if (cancelled) return;
+
+        // Crawl `@/...` imports inside the fetched files and pull those siblings
+        // too, so components that depend on shared utilities (icons, helpers,
+        // contexts) bundle successfully even when not listed in sourceLayout.
+        // One hop is enough for the common case; deeper graphs degrade gracefully.
+        const crawled = await crawlAliasImports(
+          initial.files,
+          fetchPaths,
+          /* maxHops */ 2
+        );
+        if (cancelled) return;
+
+        const data = crawled;
 
         // The primary component file is required
         const componentPath = `${manifest.sourceLayout.componentsDir}/${component.file}`;
@@ -994,14 +1084,14 @@ export function LiveComponentSandbox({
           cycleComponents: availableCycle,
         });
         setState({ status: "ready", files: sandboxFiles });
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) return;
         setState({
           status: "error",
           message: err instanceof Error ? err.message : "Unknown error",
         });
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

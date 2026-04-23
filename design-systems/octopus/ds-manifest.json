@@ -18,13 +18,13 @@
   "installPath": "design-systems/octopus",
   "sourceLayout": {
     "platform": "web-react",
-    "componentsDir": "src/components/ui",
+    "componentsDir": "design-systems/octopus/src/components/ui",
     "files": [
-      { "path": "src/styles/design-tokens.ts", "role": "tokens" },
-      { "path": "src/styles/color-utils.ts", "role": "colorUtils" },
-      { "path": "src/components/providers/theme-provider.tsx", "role": "themeProvider" },
-      { "path": "src/components/providers/role-provider.tsx", "role": "roleProvider" },
-      { "path": "src/app/globals.css", "role": "globalsCss" }
+      { "path": "design-systems/octopus/src/styles/design-tokens.ts", "role": "tokens" },
+      { "path": "design-systems/octopus/src/styles/color-utils.ts", "role": "colorUtils" },
+      { "path": "design-systems/octopus/src/components/providers/theme-provider.tsx", "role": "themeProvider" },
+      { "path": "design-systems/octopus/src/components/providers/role-provider.tsx", "role": "roleProvider" },
+      { "path": "design-systems/octopus/src/app/globals.css", "role": "globalsCss" }
     ]
   },
   "technology": ["react-19", "typescript", "tailwind-v4", "next-16"],

@@ -308,6 +308,40 @@ function normalizeFileName(input: string, platform: DSPlatform): string {
   return `${kebab}${defaultExtension(platform)}`;
 }
 
+// Resolve a user-supplied component identifier (display name like "Button" or
+// "JetsnackButton", or a filename like "components/Button.kt") against a
+// manifest's component list. Tries multiple matching strategies to handle:
+// - mobile DSes where files live in subdirs (`components/Button.kt`)
+// - DSes with prefixed component names (`JetsnackButton`, `ShadButton`)
+// - case differences (Kotlin PascalCase vs Compose conventions)
+function findComponentMeta(
+  components: DSManifest["components"],
+  input: string,
+  platform: DSPlatform
+) {
+  const fileName = normalizeFileName(input, platform); // e.g. "button.kt"
+  const inputLower = input.toLowerCase();
+  const inputAsKey = inputLower.replace(/[\s_-]/g, "");
+
+  return components.find((c) => {
+    const fileLower = c.file.toLowerCase();
+    const nameLower = c.name.toLowerCase();
+    const fileBase = fileLower.split("/").pop() ?? fileLower;
+
+    // 1) Exact file path
+    if (fileLower === fileName) return true;
+    // 2) Basename match (handles nested paths)
+    if (fileBase === fileName) return true;
+    // 3) Exact name match (case-insensitive)
+    if (nameLower === inputLower) return true;
+    // 4) Name suffix match (e.g. "Button" matches "JetsnackButton")
+    //    Only after stripping separators on both sides.
+    const nameKey = nameLower.replace(/[\s_-]/g, "");
+    if (nameKey.endsWith(inputAsKey) && inputAsKey.length >= 3) return true;
+    return false;
+  });
+}
+
 function defaultExtension(platform: DSPlatform): string {
   switch (platform) {
     case "web-react":
@@ -339,11 +373,10 @@ export async function installComponent(args: {
   }
 
   const platform = manifest.platform;
-  const fileName = normalizeFileName(args.componentName, platform);
-  const componentMeta = manifest.components.find(
-    (c) =>
-      c.file.toLowerCase() === fileName ||
-      c.name.toLowerCase() === args.componentName.toLowerCase()
+  const componentMeta = findComponentMeta(
+    manifest.components,
+    args.componentName,
+    platform
   );
   if (!componentMeta) {
     const available = manifest.components.map((c) => c.name).join(", ");

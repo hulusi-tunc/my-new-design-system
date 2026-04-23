@@ -5,7 +5,13 @@ import type {
   ExtractionWarning,
 } from "../types";
 import type { DSComponent } from "@/lib/types";
-import { commonAncestor, dirname, suggestSlug, toTitleCase } from "./_shared";
+import {
+  commonAncestor,
+  dirname,
+  relativeTo,
+  suggestSlug,
+  toTitleCase,
+} from "./_shared";
 
 const SWIFT_EXT = /\.swift$/;
 const VIEW_STRUCT =
@@ -48,7 +54,6 @@ export const iosSwiftuiExtractor: Extractor = {
 
     const componentEntries: Array<{
       name: string;
-      file: string;
       variants: number;
       fullPath: string;
     }> = [];
@@ -70,11 +75,8 @@ export const iosSwiftuiExtractor: Extractor = {
       const matches = [...content.matchAll(VIEW_STRUCT)];
       if (matches.length === 0) continue;
 
-      const primaryName = matches[0][1];
-      const fileName = entry.path.split("/").pop() ?? entry.path;
       componentEntries.push({
-        name: primaryName,
-        file: fileName,
+        name: matches[0][1],
         variants: matches.length,
         fullPath: entry.path,
       });
@@ -88,7 +90,7 @@ export const iosSwiftuiExtractor: Extractor = {
 
     const components: DSComponent[] = componentEntries.map((c) => ({
       name: c.name,
-      file: c.file,
+      file: relativeTo(componentsDir, c.fullPath),
       variants: c.variants > 1 ? c.variants : undefined,
     }));
 

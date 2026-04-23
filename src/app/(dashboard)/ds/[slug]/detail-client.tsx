@@ -7,11 +7,12 @@ import { getNd, editorialFonts } from "@/lib/nothing-tokens";
 import { resolveDsTokens } from "@/lib/resolve-ds-tokens";
 import { ComponentExplorer } from "@/components/registry/component-explorer";
 import { MobileComponentViewer } from "@/components/registry/mobile-component-viewer";
+import { DesignMdPanel } from "@/components/registry/design-md-panel";
 import { RelatedSystems } from "@/components/registry/family-tree";
 import { getCategoryForPlatform } from "@/lib/platforms";
 import type { DSManifest } from "@/lib/types";
 
-type Tab = "components" | "forks";
+type Tab = "components" | "design-md" | "forks";
 
 export function DetailClient({
   manifest,
@@ -34,6 +35,10 @@ export function DetailClient({
     {
       id: "components",
       label: `COMPONENTS (${String(manifest.components.length).padStart(2, "0")})`,
+    },
+    {
+      id: "design-md",
+      label: "DESIGN.MD",
     },
     {
       id: "forks",
@@ -101,6 +106,8 @@ export function DetailClient({
             ) : (
               <MobileComponentViewer manifest={manifest} />
             ))}
+
+          {activeTab === "design-md" && <DesignMdPanel manifest={manifest} />}
 
           {activeTab === "forks" && (
             <ForksTab forks={forks} allManifests={allManifests} manifest={manifest} t={t} />

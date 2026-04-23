@@ -16,6 +16,15 @@ export function dirname(p: string): string {
   return idx === -1 ? "" : p.slice(0, idx);
 }
 
+// Path of `full` relative to `base`. If `full` doesn't sit under `base`,
+// falls back to the basename so callers always get a usable string.
+export function relativeTo(base: string, full: string): string {
+  if (!base) return full;
+  const prefix = base.endsWith("/") ? base : base + "/";
+  if (full.startsWith(prefix)) return full.slice(prefix.length);
+  return full.split("/").pop() ?? full;
+}
+
 export function suggestSlug(repo: string): string {
   return repo
     .toLowerCase()

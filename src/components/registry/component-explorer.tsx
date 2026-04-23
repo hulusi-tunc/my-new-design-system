@@ -26,6 +26,10 @@ import {
   FOUNDATION_ENTRIES,
   type FoundationEntry,
 } from "@/components/registry/foundation-previews";
+import {
+  inferComponentSchema,
+  type InferredSchema,
+} from "@/lib/ds-source-parser";
 import type { DSComponent, DSManifest } from "@/lib/types";
 
 import ArrowDropDownLineIcon from "remixicon-react/ArrowDropDownLineIcon";
@@ -34,6 +38,8 @@ import FullscreenExitLineIcon from "remixicon-react/FullscreenExitLineIcon";
 import CloseLineIcon from "remixicon-react/CloseLineIcon";
 import Apps2LineIcon from "remixicon-react/Apps2LineIcon";
 import SettingsLineIcon from "remixicon-react/SettingsLineIcon";
+import SunLineIcon from "remixicon-react/SunLineIcon";
+import MoonLineIcon from "remixicon-react/MoonLineIcon";
 
 /* ─── View mode ───────────────────────────────────── */
 
@@ -97,9 +103,18 @@ const CATEGORY_ORDER = [
 export function ComponentExplorer({ manifest }: { manifest: DSManifest }) {
   const { theme } = useTheme();
   const t = getNd(theme);
+
+  // DS-level theme override — lets users preview this design system in light
+  // or dark independently of Hubera's own theme. `null` follows Hubera.
+  const [dsThemeOverride, setDsThemeOverride] = useState<"light" | "dark" | null>(
+    null
+  );
+  const effectiveDsTheme: "light" | "dark" =
+    dsThemeOverride ?? (theme === "light" ? "light" : "dark");
+
   const ds = useMemo(
-    () => resolveDsTokens(manifest.tokens, theme === "light" ? "light" : "dark"),
-    [manifest.tokens, theme]
+    () => resolveDsTokens(manifest.tokens, effectiveDsTheme),
+    [manifest.tokens, effectiveDsTheme]
   );
 
   /* ── Group components by category ──────────────── */
@@ -167,10 +182,79 @@ export function ComponentExplorer({ manifest }: { manifest: DSManifest }) {
     return new Set(filteredCategories);
   }, [treeQuery, openCategories, filteredCategories]);
 
-  const selectedComponent = useMemo(() => {
+  const rawSelectedComponent = useMemo(() => {
     if (selection.type !== "component") return undefined;
     return manifest.components.find((c) => c.name === selection.name);
   }, [manifest.components, selection]);
+
+  /* ── Auto-infer props / examples from component source ──
+     Many DS manifests declare only `variants: N, sizes: N` counts without
+     explicit `props` or `examples` metadata. We fetch the component's
+     TypeScript source and regex-parse its prop types so Gallery and
+     Playground work universally, not just for manifests that were
+     hand-written with full metadata. */
+  const [inferredByComponent, setInferredByComponent] = useState<
+    Record<string, InferredSchema>
+  >({});
+
+  useEffect(() => {
+    const c = rawSelectedComponent;
+    if (!c) return;
+    const cacheKey = `${manifest.slug}:${c.name}`;
+    if (inferredByComponent[cacheKey]) return;
+
+    const hasManifestProps =
+      c.props && Object.keys(c.props).length > 0;
+    const hasManifestExamples = (c.examples?.length ?? 0) > 0;
+    if (hasManifestProps && hasManifestExamples) return;
+
+    const sourcePath = `${manifest.sourceLayout.componentsDir}/${c.file}`;
+    let cancelled = false;
+
+    fetch(`/api/ds-source/${manifest.slug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths: [sourcePath] }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { files?: Record<string, string> } | null) => {
+        if (cancelled || !data?.files?.[sourcePath]) return;
+        const schema = inferComponentSchema(
+          data.files[sourcePath],
+          toPascalCase(c.name),
+          { variantCount: c.variants, sizeCount: c.sizes }
+        );
+        setInferredByComponent((prev) => ({ ...prev, [cacheKey]: schema }));
+      })
+      .catch(() => {
+        /* Inference is best-effort — a failure just leaves Gallery/Playground
+           in their manifest-only state. */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawSelectedComponent, manifest.slug, manifest.sourceLayout.componentsDir, inferredByComponent]);
+
+  const selectedComponent = useMemo<DSComponent | undefined>(() => {
+    const c = rawSelectedComponent;
+    if (!c) return undefined;
+    const cacheKey = `${manifest.slug}:${c.name}`;
+    const inferred = inferredByComponent[cacheKey];
+    if (!inferred) return c;
+
+    const manifestProps = c.props ?? {};
+    const manifestExamples = c.examples ?? [];
+    // Manifest wins where declared; inferred fills gaps.
+    const mergedProps =
+      Object.keys(manifestProps).length > 0
+        ? manifestProps
+        : inferred.props;
+    const mergedExamples =
+      manifestExamples.length > 0 ? manifestExamples : inferred.examples;
+
+    return { ...c, props: mergedProps, examples: mergedExamples };
+  }, [rawSelectedComponent, inferredByComponent, manifest.slug]);
 
   const selectedFoundation = useMemo(() => {
     if (selection.type !== "foundation") return undefined;
@@ -386,6 +470,8 @@ export function ComponentExplorer({ manifest }: { manifest: DSManifest }) {
                 onExpand={() => setExpanded(true)}
                 canGallery={(selectedComponent.examples?.length ?? 0) > 0}
                 canPlayground={Object.keys(selectedComponent.props ?? {}).length > 0}
+                dsTheme={effectiveDsTheme}
+                onDsThemeChange={setDsThemeOverride}
                 t={t}
               />
               {!expanded && (
@@ -396,6 +482,7 @@ export function ComponentExplorer({ manifest }: { manifest: DSManifest }) {
                   propValues={currentPropValues}
                   onPropChange={setPropValue}
                   onResetProps={resetPropValues}
+                  dsTheme={effectiveDsTheme}
                   ds={ds}
                   t={t}
                 />
@@ -429,6 +516,7 @@ export function ComponentExplorer({ manifest }: { manifest: DSManifest }) {
           onClose={() => setExpanded(false)}
           t={t}
           ds={ds}
+          dsTheme={effectiveDsTheme}
         />
       )}
 
@@ -805,6 +893,8 @@ function PreviewPaneHeader({
   canGallery,
   canPlayground,
   onExpand,
+  dsTheme,
+  onDsThemeChange,
   t,
 }: {
   component: DSComponent;
@@ -813,6 +903,8 @@ function PreviewPaneHeader({
   canGallery: boolean;
   canPlayground: boolean;
   onExpand: () => void;
+  dsTheme: "light" | "dark";
+  onDsThemeChange: (next: "light" | "dark" | null) => void;
   t: ReturnType<typeof getNd>;
 }) {
   const variants = component.variants ?? 0;
@@ -852,7 +944,10 @@ function PreviewPaneHeader({
     flexWrap: "wrap",
   };
 
-  const showToggle = canGallery && canPlayground;
+  // Show the Gallery / Playground toggle whenever either mode is meaningful.
+  // Previously required BOTH, which silently hid the affordance on components
+  // that only had examples OR only had props — making the feature invisible.
+  const showToggle = canGallery || canPlayground;
 
   return (
     <div style={barStyle}>
@@ -887,9 +982,17 @@ function PreviewPaneHeader({
         <ViewToggle
           viewMode={viewMode}
           onChange={onViewModeChange}
+          canGallery={canGallery}
+          canPlayground={canPlayground}
           t={t}
         />
       )}
+
+      <DsThemeToggle
+        dsTheme={dsTheme}
+        onChange={(next) => onDsThemeChange(next)}
+        t={t}
+      />
 
       <IconButton label="Expand preview" onClick={onExpand} t={t}>
         <FullscreenLineIcon size={16} />
@@ -898,15 +1001,102 @@ function PreviewPaneHeader({
   );
 }
 
-/* ─── View toggle (Gallery / Playground) ────────── */
+/* ─── View toggle (Gallery / Playground) ──────────
+   Gallery = walk through the DS's declared examples.
+   Playground = tweak props live.
+   Unavailable modes render disabled so users see the capability exists. */
 
 function ViewToggle({
   viewMode,
   onChange,
+  canGallery,
+  canPlayground,
   t,
 }: {
   viewMode: ViewMode;
   onChange: (m: ViewMode) => void;
+  canGallery: boolean;
+  canPlayground: boolean;
+  t: ReturnType<typeof getNd>;
+}) {
+  const wrapperStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 2,
+    padding: 2,
+    border: `1px solid ${t.border}`,
+    borderRadius: swatchRadii.md,
+    background: t.surfaceInk,
+  };
+
+  const buttonStyle = (active: boolean, enabled: boolean): CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "5px 10px",
+    borderRadius: swatchRadii.sm,
+    border: "none",
+    background: active ? t.surfaceRaised : "transparent",
+    color: enabled
+      ? active
+        ? t.textDisplay
+        : t.textSecondary
+      : t.textDisabled,
+    fontFamily: editorialFonts.body,
+    fontSize: 12,
+    fontWeight: active ? 600 : 500,
+    cursor: enabled ? "pointer" : "not-allowed",
+    opacity: enabled ? 1 : 0.55,
+    transition: "background 120ms ease-out, color 120ms ease-out",
+  });
+
+  return (
+    <div style={wrapperStyle}>
+      <button
+        type="button"
+        style={buttonStyle(viewMode === "gallery", canGallery)}
+        onClick={() => canGallery && onChange("gallery")}
+        aria-pressed={viewMode === "gallery"}
+        aria-disabled={!canGallery}
+        disabled={!canGallery}
+        title={
+          canGallery
+            ? "Browse all declared examples"
+            : "This component has no examples declared in the manifest"
+        }
+      >
+        <Apps2LineIcon size={13} />
+        Gallery
+      </button>
+      <button
+        type="button"
+        style={buttonStyle(viewMode === "playground", canPlayground)}
+        onClick={() => canPlayground && onChange("playground")}
+        aria-pressed={viewMode === "playground"}
+        aria-disabled={!canPlayground}
+        disabled={!canPlayground}
+        title={
+          canPlayground
+            ? "Tweak props live"
+            : "This component has no props declared in the manifest"
+        }
+      >
+        <SettingsLineIcon size={13} />
+        Playground
+      </button>
+    </div>
+  );
+}
+
+/* ─── DS theme toggle (Light / Dark) ─────────────── */
+
+function DsThemeToggle({
+  dsTheme,
+  onChange,
+  t,
+}: {
+  dsTheme: "light" | "dark";
+  onChange: (next: "light" | "dark") => void;
   t: ReturnType<typeof getNd>;
 }) {
   const wrapperStyle: CSSProperties = {
@@ -936,24 +1126,26 @@ function ViewToggle({
   });
 
   return (
-    <div style={wrapperStyle}>
+    <div style={wrapperStyle} title="Preview this design system in light or dark">
       <button
         type="button"
-        style={buttonStyle(viewMode === "gallery")}
-        onClick={() => onChange("gallery")}
-        aria-pressed={viewMode === "gallery"}
+        style={buttonStyle(dsTheme === "light")}
+        onClick={() => onChange("light")}
+        aria-pressed={dsTheme === "light"}
+        aria-label="Preview in light mode"
       >
-        <Apps2LineIcon size={13} />
-        Gallery
+        <SunLineIcon size={13} />
+        Light
       </button>
       <button
         type="button"
-        style={buttonStyle(viewMode === "playground")}
-        onClick={() => onChange("playground")}
-        aria-pressed={viewMode === "playground"}
+        style={buttonStyle(dsTheme === "dark")}
+        onClick={() => onChange("dark")}
+        aria-pressed={dsTheme === "dark"}
+        aria-label="Preview in dark mode"
       >
-        <SettingsLineIcon size={13} />
-        Playground
+        <MoonLineIcon size={13} />
+        Dark
       </button>
     </div>
   );
@@ -969,6 +1161,7 @@ function PreviewFrame({
   onPropChange,
   onResetProps,
   ds,
+  dsTheme,
   t,
 }: {
   manifest: DSManifest;
@@ -978,6 +1171,7 @@ function PreviewFrame({
   onPropChange: (name: string, value: PropValue) => void;
   onResetProps: () => void;
   ds: ReturnType<typeof resolveDsTokens>;
+  dsTheme: "light" | "dark";
   t: ReturnType<typeof getNd>;
 }) {
   const size = component.displaySize ?? inferDisplaySize(component.name);
@@ -1005,6 +1199,7 @@ function PreviewFrame({
           component={component}
           examples={hasExamples ? component.examples : undefined}
           height={Math.max(frame.height, 420)}
+          themeOverride={dsTheme}
           bare
         />
       </div>
@@ -1056,6 +1251,7 @@ function PreviewFrame({
             exampleCode={generatedJsx}
             mode="single"
             height={frame.height}
+            themeOverride={dsTheme}
             bare
           />
         </div>
@@ -1083,6 +1279,7 @@ function ExpandedModal({
   onClose,
   t,
   ds,
+  dsTheme,
 }: {
   manifest: DSManifest;
   component: DSComponent;
@@ -1091,6 +1288,7 @@ function ExpandedModal({
   onClose: () => void;
   t: ReturnType<typeof getNd>;
   ds: ReturnType<typeof resolveDsTokens>;
+  dsTheme: "light" | "dark";
 }) {
   const Comp = toPascalCase(component.name);
   const hasExamples = (component.examples?.length ?? 0) > 0;
@@ -1197,6 +1395,7 @@ function ExpandedModal({
             exampleCode={generatedJsx}
             mode={useGallery ? "gallery" : "single"}
             height="100%"
+            themeOverride={dsTheme}
             bare
           />
         </div>

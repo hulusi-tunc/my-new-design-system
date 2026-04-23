@@ -1,0 +1,165 @@
+{
+  "name": "Jetsnack",
+  "slug": "jetsnack",
+  "version": "0.1.0",
+  "description": "Jetpack Compose design system for the official Jetsnack sample app — Material 3 widgets, custom gradient theming, and five color scales (Shadow, Ocean, Lavender, Rose, Neutral) plus functional semantic colors.",
+  "author": {
+    "name": "android",
+    "github": "android",
+    "avatar": "https://github.com/android.png"
+  },
+  "license": "Apache-2.0",
+  "createdAt": "2026-04-20",
+  "updatedAt": "2026-04-20",
+  "parent": null,
+  "platform": "android-compose",
+  "repository": "https://github.com/android/compose-samples",
+  "defaultBranch": "main",
+  "installPath": "design-systems/jetsnack",
+  "sourceLayout": {
+    "platform": "android-compose",
+    "componentsDir": "Jetsnack/app/src/main/java/com/example/jetsnack/ui",
+    "files": [
+      {
+        "path": "Jetsnack/app/src/main/java/com/example/jetsnack/ui/theme/Color.kt",
+        "role": "colorKt"
+      },
+      {
+        "path": "Jetsnack/app/src/main/java/com/example/jetsnack/ui/theme/Shape.kt",
+        "role": "shapesKt"
+      },
+      {
+        "path": "Jetsnack/app/src/main/java/com/example/jetsnack/ui/theme/Theme.kt",
+        "role": "themeKt"
+      },
+      {
+        "path": "Jetsnack/app/src/main/java/com/example/jetsnack/ui/theme/Type.kt",
+        "role": "typographyKt"
+      }
+    ]
+  },
+  "technology": ["jetpack-compose", "kotlin", "material3"],
+  "architecture": "material3",
+  "tokens": {
+    "colors": {
+      "shadow": {
+        "0": "#F4F2FF",
+        "1": "#DED6FE",
+        "2": "#C8BBFD",
+        "3": "#9B86FA",
+        "4": "#7057F5",
+        "5": "#4B30ED",
+        "6": "#2A13E4",
+        "7": "#0E00D7",
+        "8": "#0200C7",
+        "9": "#0009B3",
+        "10": "#00119E",
+        "11": "#001787"
+      },
+      "ocean": {
+        "0": "#F2FFFF",
+        "1": "#D6FEFE",
+        "2": "#BBFDFD",
+        "3": "#86F7FA",
+        "4": "#57EFF5",
+        "5": "#30E2ED",
+        "6": "#13D0E4",
+        "7": "#00B9D7",
+        "8": "#00A1C7",
+        "9": "#0087B3",
+        "10": "#006D9E",
+        "11": "#005687"
+      },
+      "lavender": {
+        "0": "#F9F2FF",
+        "1": "#EBD6FE",
+        "2": "#DEBBFD",
+        "3": "#C186FA",
+        "4": "#A557F5",
+        "5": "#8A30ED",
+        "6": "#6F13E4",
+        "7": "#5500D7",
+        "8": "#4400C7",
+        "9": "#3300B3",
+        "10": "#23009E",
+        "11": "#170085"
+      },
+      "rose": {
+        "0": "#FFF2F6",
+        "1": "#FED6E2",
+        "2": "#FDBBCF",
+        "3": "#F985AA",
+        "4": "#F4568B",
+        "5": "#EC3074",
+        "6": "#E21365",
+        "7": "#D4005D",
+        "8": "#C30060",
+        "9": "#AF0060",
+        "10": "#97005C",
+        "11": "#7F0054"
+      },
+      "neutral": {
+        "0": "#FFFFFF",
+        "1": "#FFFFFF",
+        "2": "#FFFFFF",
+        "3": "#FFFFFF",
+        "4": "#000000",
+        "5": "#000000",
+        "6": "#000000",
+        "7": "#000000",
+        "8": "#121212"
+      },
+      "functional": {
+        "red": "#D00036",
+        "redDark": "#EA6D7E",
+        "green": "#52C41A",
+        "grey": "#F6F6F6",
+        "darkGrey": "#2E2E2E"
+      }
+    },
+    "typography": {
+      "fontFamily": "Roboto",
+      "weights": ["400", "500", "600", "700"],
+      "scaleSteps": 6
+    },
+    "spacing": {
+      "unit": "dp",
+      "steps": 8
+    },
+    "radius": {
+      "steps": 5,
+      "full": 9999
+    }
+  },
+  "components": [
+    { "name": "JetsnackApp", "file": "JetsnackApp.kt", "variants": 2 },
+    { "name": "JetsnackButton", "file": "components/Button.kt", "variants": 3 },
+    { "name": "JetsnackCard", "file": "components/Card.kt", "variants": 2 },
+    { "name": "JetsnackDivider", "file": "components/Divider.kt", "variants": 2 },
+    { "name": "FilterBar", "file": "components/Filters.kt", "variants": 4 },
+    { "name": "JetsnackGradientTintedIconButton", "file": "components/GradientTintedIconButton.kt", "variants": 2 },
+    { "name": "VerticalGrid", "file": "components/Grid.kt" },
+    { "name": "QuantitySelector", "file": "components/QuantitySelector.kt", "variants": 3 },
+    { "name": "JetsnackScaffold", "file": "components/Scaffold.kt" },
+    { "name": "JetsnackSnackbar", "file": "components/Snackbar.kt" },
+    { "name": "SnackCollection", "file": "components/Snacks.kt", "variants": 8 },
+    { "name": "JetsnackSurface", "file": "components/Surface.kt" },
+    { "name": "DestinationBar", "file": "home/DestinationBar.kt", "variants": 2 },
+    { "name": "Feed", "file": "home/Feed.kt", "variants": 4 },
+    { "name": "FilterScreen", "file": "home/FilterScreen.kt", "variants": 8 },
+    { "name": "JetsnackBottomBar", "file": "home/Home.kt", "variants": 6 },
+    { "name": "Profile", "file": "home/Profile.kt", "variants": 2 },
+    { "name": "Cart", "file": "home/cart/Cart.kt", "variants": 8 },
+    { "name": "SwipeDismissItem", "file": "home/cart/SwipeDismissItem.kt" },
+    { "name": "SearchCategories", "file": "home/search/Categories.kt", "variants": 4 },
+    { "name": "SearchResults", "file": "home/search/Results.kt", "variants": 4 },
+    { "name": "Search", "file": "home/search/Search.kt", "variants": 4 },
+    { "name": "SearchSuggestions", "file": "home/search/Suggestions.kt", "variants": 4 },
+    { "name": "SnackDetail", "file": "snackdetail/SnackDetail.kt", "variants": 9 }
+  ],
+  "screenshots": {
+    "preview": "",
+    "gallery": []
+  },
+  "tags": ["jetpack-compose", "kotlin", "material3", "sample-app", "imported"]
+}

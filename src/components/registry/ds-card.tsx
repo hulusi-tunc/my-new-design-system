@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useTheme } from "@/components/providers/theme-provider";
 import { getNd, editorialFonts, swatchRadii } from "@/lib/nothing-tokens";
 import { DSPreviewCarousel } from "@/components/registry/ds-preview-carousel";
+import { getThemeSupport, type ThemeSupport } from "@/lib/theme-support";
 import type { DSManifest } from "@/lib/types";
+import SunLineIcon from "remixicon-react/SunLineIcon";
+import MoonLineIcon from "remixicon-react/MoonLineIcon";
+import ContrastLineIcon from "remixicon-react/ContrastLineIcon";
 
 interface DSCardProps {
   manifest: DSManifest;
@@ -45,6 +49,8 @@ export function DSCard({ manifest, forkCount = 0 }: DSCardProps) {
 
   // Try to extract a single brand dot color from manifest tokens
   const brandDot = extractBrandColor(manifest.tokens?.colors, t.accent);
+
+  const themeSupport = getThemeSupport(manifest);
 
   return (
     <Link
@@ -158,21 +164,69 @@ export function DSCard({ manifest, forkCount = 0 }: DSCardProps) {
             {shortDescription(manifest.description)}
           </p>
         </div>
-        {forkCount > 0 && (
-          <span
-            style={{
-              fontFamily: editorialFonts.mono,
-              fontSize: 11,
-              color: t.textDisabled,
-              marginTop: 4,
-              flexShrink: 0,
-            }}
-          >
-            {forkCount}
-          </span>
-        )}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 4,
+            flexShrink: 0,
+            color: t.textDisabled,
+          }}
+        >
+          <ThemeSupportMark support={themeSupport} color={t.textDisabled} />
+          {forkCount > 0 && (
+            <span
+              style={{
+                fontFamily: editorialFonts.mono,
+                fontSize: 11,
+                color: t.textDisabled,
+              }}
+            >
+              {forkCount}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
+  );
+}
+
+/* ── theme-support mark ────────────────────────────
+   Quiet inline glyph in the card meta row, sized to match fork count etc.
+   No pill, no backdrop — just the icon, inheriting the muted meta color. */
+
+function ThemeSupportMark({
+  support,
+  color,
+}: {
+  support: ThemeSupport;
+  color: string;
+}) {
+  const cfg = (() => {
+    if (support === "both") {
+      return { label: "Light & dark mode", icon: <ContrastLineIcon size={13} /> };
+    }
+    if (support === "dark") {
+      return { label: "Dark mode only", icon: <MoonLineIcon size={13} /> };
+    }
+    return { label: "Light mode only", icon: <SunLineIcon size={13} /> };
+  })();
+
+  return (
+    <span
+      aria-label={cfg.label}
+      title={cfg.label}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color,
+        lineHeight: 0,
+      }}
+    >
+      {cfg.icon}
+    </span>
   );
 }
 

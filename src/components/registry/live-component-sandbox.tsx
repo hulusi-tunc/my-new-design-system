@@ -705,17 +705,26 @@ function renderAppWrapper(
   }
 
   // When the DS relies on Tailwind classes (e.g. CESP's `bg-[var(--primary-base)]`),
-  // inject the Tailwind Play CDN into the iframe's <head> so those classes
-  // actually compile to styles. Without this, components render unstyled
-  // because Sandpack's react-ts template doesn't run a Tailwind build.
+  // inject the Tailwind Play CDN into the iframe's <head>. We also set
+  // `tailwind.config.darkMode = "class"` once the script loads so `dark:`
+  // utilities respond to our own `.dark` class flip instead of to the
+  // iframe's OS preference.
   const tailwindLoader = needsTailwindCdn
     ? `
 function useHuberaTailwind() {
   useEffect(() => {
     if (document.getElementById("hubera-tailwind-cdn")) return;
+    const configureDarkMode = () => {
+      try {
+        const tw = window.tailwind;
+        if (!tw) return;
+        tw.config = Object.assign({}, tw.config, { darkMode: "class" });
+      } catch (err) {}
+    };
     const script = document.createElement("script");
     script.id = "hubera-tailwind-cdn";
     script.src = "https://cdn.tailwindcss.com";
+    script.addEventListener("load", configureDarkMode);
     document.head.appendChild(script);
   }, []);
 }`
@@ -723,41 +732,80 @@ function useHuberaTailwind() {
 
   const tailwindCall = needsTailwindCdn ? "useHuberaTailwind();" : "";
 
+  // DS theme providers come in three flavours we need to satisfy at once:
+  //   1. Inline-style providers (Octopus) — read localStorage on mount and
+  //      keep internal React state; external class flips don't reach them.
+  //   2. CSS-variable providers (CESP) — key off a `.dark` / `.light` class
+  //      on <html>, sometimes via data-theme attribute.
+  //   3. Tailwind `dark:` utilities (shadcn/cva systems) — require Tailwind's
+  //      `darkMode: "class"` plus a `.dark` class on <html>.
+  //
+  // Strategy: on every theme message, (a) write every common localStorage
+  // key, (b) flip the class + data-attribute + color-scheme, (c) track the
+  // mode in React state. The outer <div key={mode}> then force-remounts the
+  // DS tree so flavour-1 providers reinitialise against the freshly-written
+  // localStorage value.
   return `${imports.join("\n")}
 
-function useHuberaTheme() {
+const HUBERA_THEME_KEYS = [
+  "theme",
+  "ds-theme",
+  "color-mode",
+  "next-theme",
+  "app-theme",
+  "octopus-theme",
+  "cesp-theme",
+  "hubera-theme",
+];
+
+function useHuberaThemeMode() {
+  const [mode, setMode] = useState(null);
   useEffect(() => {
-    const apply = (mode) => {
+    const apply = (next) => {
+      const m = next === "dark" ? "dark" : "light";
       const el = document.documentElement;
       el.classList.remove("dark", "light");
-      el.classList.add(mode === "dark" ? "dark" : "light");
-      el.dataset.theme = mode === "dark" ? "dark" : "light";
+      el.classList.add(m);
+      el.dataset.theme = m;
+      el.style.colorScheme = m;
+      try {
+        for (const key of HUBERA_THEME_KEYS) {
+          localStorage.setItem(key, m);
+        }
+      } catch (err) {}
+      setMode(m);
     };
     const onMsg = (e) => {
       const d = e && e.data;
       if (!d || typeof d !== "object") return;
       if (d.type !== "hubera:theme") return;
-      apply(d.theme === "dark" ? "dark" : "light");
+      apply(d.theme);
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+  return mode;
 }
 ${tailwindLoader}
 
 export default function App() {
-  useHuberaTheme();
   ${tailwindCall}
+  const huberaMode = useHuberaThemeMode();
   return (
-    ${wrapperOpen.join("\n      ")}
-      <>
-        <style>{\`
-          html, body, #root { margin: 0; padding: 0; height: 100%; overflow: auto; font-family: system-ui, sans-serif; background: transparent; }
-          * { box-sizing: border-box; }
-        \`}</style>
-        ${stageCore}
-      </>
-    ${wrapperClose.join("\n      ")}
+    <div
+      key={huberaMode || "init"}
+      style={{ minHeight: "100%", display: "flex", flexDirection: "column" }}
+    >
+      ${wrapperOpen.join("\n      ")}
+        <>
+          <style>{\`
+            html, body, #root { margin: 0; padding: 0; height: 100%; overflow: auto; font-family: system-ui, sans-serif; background: transparent; }
+            * { box-sizing: border-box; }
+          \`}</style>
+          ${stageCore}
+        </>
+      ${wrapperClose.join("\n      ")}
+    </div>
   );
 }
 `;

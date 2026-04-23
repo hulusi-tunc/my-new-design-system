@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useCallback,
   type CSSProperties,
@@ -222,6 +223,10 @@ type SlideProps = {
   /** True once the card has entered the viewport. Gates expensive live-render
    *  iframes (Sandpack in the Components slide) so off-screen cards stay cheap. */
   inView: boolean;
+  /** True when the host device is a touch/coarse-pointer device. Slides use
+   *  this to enable hover-equivalent affordances (e.g. auto-cycle) that
+   *  would otherwise require hover. */
+  coarsePointer: boolean;
 };
 
 function TypographySlide({ manifest, brand, dsFont, ds }: SlideProps) {
@@ -376,7 +381,7 @@ function TypographySlide({ manifest, brand, dsFont, ds }: SlideProps) {
  * If the DS has no Button component we render nothing (the carousel skips
  * the slide) so we never show fake buttons alongside real ones.
  */
-function ButtonsSlide({ manifest, ds, t, hovered, inView }: SlideProps) {
+function ButtonsSlide({ manifest, ds, t, hovered, inView, coarsePointer }: SlideProps) {
   const buttonComponent = useMemo(() => {
     const normalise = (name: string) => name.toLowerCase().replace(/[\s_-]/g, "");
     return (
@@ -441,7 +446,7 @@ function ButtonsSlide({ manifest, ds, t, hovered, inView }: SlideProps) {
             component={buttonComponent}
             examples={examples}
             mode={examples && examples.length > 1 ? "gallery" : "single"}
-            cyclingEnabled={hovered}
+            cyclingEnabled={hovered || coarsePointer}
             height="100%"
             bare
             transparentBg
@@ -792,7 +797,7 @@ function ComponentsSlide({ manifest, ds, t, hovered, inView }: SlideProps) {
  * was visually generic because each cell communicated a weak signal. A DS's
  * identity is its font + brand + component feel, not a list of tokens.
  */
-function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered, inView }: SlideProps) {
+function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered, inView, coarsePointer }: SlideProps) {
   const fontName =
     manifest.tokens.typography?.fontFamily?.split(",")[0]?.replace(/['"]/g, "").trim() ||
     "System";
@@ -958,7 +963,7 @@ function OverviewSlide({ manifest, brand, dsFont, ds, t, hovered, inView }: Slid
               manifest={manifest}
               component={previewComponent}
               cycleComponents={cycleComponents}
-              cyclingEnabled={hovered}
+              cyclingEnabled={hovered || coarsePointer}
               height="100%"
               bare
               transparentBg
@@ -1029,6 +1034,24 @@ export function DSPreviewCarousel({
   const t = getNd(theme);
   const [index, setIndex] = useState(0);
 
+  // Detect coarse pointers (touch devices) so the UI can show controls
+  // without relying on hover. Hover doesn't exist on mobile — if we stayed
+  // hover-gated, touch users would never see arrows or dots.
+  const [coarsePointer, setCoarsePointer] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setCoarsePointer(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
+  // Chrome (arrows / dots / label) is visible when either the user is
+  // hovering (pointer devices) or we've detected a coarse pointer. This
+  // keeps touch users in control of slide navigation.
+  const chromeVisible = hovered || coarsePointer;
+
   // Resolve the DS's own token context so the carousel surface matches
   // the design system's actual background.
   const ds = useMemo(
@@ -1062,6 +1085,32 @@ export function DSPreviewCarousel({
     e.preventDefault();
     e.stopPropagation();
     go(direction);
+  };
+
+  // Swipe gesture — lets touch users change slides by dragging sideways.
+  // We track start/end coordinates on touchstart/touchend and only treat
+  // it as a slide change if horizontal delta dominates (so vertical scroll
+  // from the page still works) and exceeds a small threshold.
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const tch = e.touches[0];
+    if (!tch) return;
+    touchStartRef.current = { x: tch.clientX, y: tch.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    const tch = e.changedTouches[0];
+    if (!tch) return;
+    const dx = tch.clientX - start.x;
+    const dy = tch.clientY - start.y;
+    const THRESHOLD = 36;
+    if (Math.abs(dx) < THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    // Suppress the parent Link's navigation for this tap when swiping.
+    e.preventDefault();
+    e.stopPropagation();
+    go(dx < 0 ? 1 : -1);
   };
 
   const currentSlide = SLIDES[index];
@@ -1099,16 +1148,22 @@ export function DSPreviewCarousel({
     gap: 6,
     alignItems: "center",
     pointerEvents: "none",
-    opacity: hovered ? 1 : 0,
+    // On pointer devices: only show while hovering. On touch: always show
+    // so users know slide navigation is available.
+    opacity: chromeVisible ? 1 : 0,
     transition: "opacity 160ms ease-out",
   };
 
+  // Arrows are bigger on coarse pointers to meet the 44px minimum target,
+  // and sit at a lower opacity so they read as controls rather than
+  // decoration (full opacity on hover).
+  const arrowSize = coarsePointer ? 44 : 36;
   const arrowBase: CSSProperties = {
     position: "absolute",
     top: "50%",
     transform: "translateY(-50%)",
-    width: 36,
-    height: 36,
+    width: arrowSize,
+    height: arrowSize,
     borderRadius: swatchRadii.full,
     background: "rgba(255,255,255,0.95)",
     color: "#111",
@@ -1117,8 +1172,8 @@ export function DSPreviewCarousel({
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    opacity: hovered ? 1 : 0,
-    pointerEvents: hovered ? "auto" : "none",
+    opacity: hovered ? 1 : coarsePointer ? 0.8 : 0,
+    pointerEvents: chromeVisible ? "auto" : "none",
     transition: "opacity 160ms ease-out, background 120ms ease-out",
     zIndex: 3,
     padding: 0,
@@ -1136,10 +1191,23 @@ export function DSPreviewCarousel({
   /* ── render ──────────────────────────────────────── */
 
   return (
-    <div style={wrapperStyle}>
+    <div
+      style={wrapperStyle}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Current slide */}
       <div key={currentSlide.key} style={slideStyle}>
-        {currentSlide.render({ manifest, brand, dsFont, ds, t, hovered, inView })}
+        {currentSlide.render({
+          manifest,
+          brand,
+          dsFont,
+          ds,
+          t,
+          hovered,
+          inView,
+          coarsePointer,
+        })}
       </div>
 
       {/* Dots indicator */}
@@ -1179,8 +1247,9 @@ export function DSPreviewCarousel({
         <ArrowRightSLineIcon size={22} />
       </button>
 
-      {/* Label pill — shows which slide you're on, bottom-center. Only
-          appears on hover (in sync with the nav arrows and dots). */}
+      {/* Label pill — shows which slide you're on, bottom-center.
+          On pointer devices it tracks hover; on touch it's always shown
+          since touch users have no hover signal. */}
       <div
         style={{
           position: "absolute",
@@ -1197,7 +1266,7 @@ export function DSPreviewCarousel({
           backdropFilter: "blur(6px)",
           pointerEvents: "none",
           zIndex: 2,
-          opacity: hovered ? 1 : 0,
+          opacity: chromeVisible ? 1 : 0,
           transition: "opacity 160ms ease-out",
         }}
       >

@@ -6,7 +6,13 @@ import type {
   TreeEntry,
 } from "../types";
 import type { DSComponent } from "@/lib/types";
-import { commonAncestor, dirname, suggestSlug, toTitleCase } from "./_shared";
+import {
+  commonAncestor,
+  dirname,
+  relativeTo,
+  suggestSlug,
+  toTitleCase,
+} from "./_shared";
 
 const TSX_EXT = /\.tsx$/;
 const SOURCE_EXT = /\.(tsx|ts|jsx|js)$/;
@@ -111,7 +117,6 @@ export const webReactExtractor: Extractor = {
     // ── Pass 2: scan .tsx files for components, scoring tokens ───────
     const componentFiles: Array<{
       name: string;
-      file: string;
       variants: number;
       fullPath: string;
       inlineStyleHits: number;
@@ -148,10 +153,8 @@ export const webReactExtractor: Extractor = {
       if (found.size === 0) continue;
 
       const names = Array.from(found);
-      const fileName = entry.path.split("/").pop() ?? entry.path;
       componentFiles.push({
         name: names[0],
-        file: fileName,
         variants: names.length,
         fullPath: entry.path,
         inlineStyleHits: countMatches(content, INLINE_STYLE_PROP),
@@ -228,7 +231,7 @@ export const webReactExtractor: Extractor = {
 
     const components: DSComponent[] = inDir.map((c) => ({
       name: c.name,
-      file: c.file,
+      file: relativeTo(componentsDir ?? "", c.fullPath),
       variants: c.variants > 1 ? c.variants : undefined,
     }));
 

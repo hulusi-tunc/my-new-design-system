@@ -5,7 +5,13 @@ import type {
   ExtractionWarning,
 } from "../types";
 import type { DSComponent } from "@/lib/types";
-import { commonAncestor, dirname, suggestSlug, toTitleCase } from "./_shared";
+import {
+  commonAncestor,
+  dirname,
+  relativeTo,
+  suggestSlug,
+  toTitleCase,
+} from "./_shared";
 
 const SOURCE_EXT = /\.(tsx|ts|jsx|js)$/;
 const TEST_FILE = /\.(test|spec|stories)\.(tsx|ts|jsx|js)$/;
@@ -59,7 +65,6 @@ export const reactNativeExtractor: Extractor = {
 
     const componentEntries: Array<{
       name: string;
-      file: string;
       variants: number;
       fullPath: string;
     }> = [];
@@ -94,10 +99,8 @@ export const reactNativeExtractor: Extractor = {
       if (found.size === 0) continue;
 
       const names = Array.from(found);
-      const fileName = entry.path.split("/").pop() ?? entry.path;
       componentEntries.push({
         name: names[0],
-        file: fileName,
         variants: names.length,
         fullPath: entry.path,
       });
@@ -111,7 +114,7 @@ export const reactNativeExtractor: Extractor = {
 
     const components: DSComponent[] = componentEntries.map((c) => ({
       name: c.name,
-      file: c.file,
+      file: relativeTo(componentsDir, c.fullPath),
       variants: c.variants > 1 ? c.variants : undefined,
     }));
 

@@ -5,7 +5,13 @@ import type {
   ExtractionWarning,
 } from "../types";
 import type { DSComponent } from "@/lib/types";
-import { commonAncestor, dirname, suggestSlug, toTitleCase } from "./_shared";
+import {
+  commonAncestor,
+  dirname,
+  relativeTo,
+  suggestSlug,
+  toTitleCase,
+} from "./_shared";
 
 const DART_EXT = /\.dart$/;
 const SKIP_PATH = /(?:^|\/)(?:\.dart_tool|build|\.pub-cache|test|integration_test)\//;
@@ -49,7 +55,6 @@ export const flutterExtractor: Extractor = {
 
     const componentEntries: Array<{
       name: string;
-      file: string;
       variants: number;
       fullPath: string;
     }> = [];
@@ -82,11 +87,8 @@ export const flutterExtractor: Extractor = {
 
       if (widgetMatches.length === 0) continue;
 
-      const primaryName = widgetMatches[0][1];
-      const fileName = entry.path.split("/").pop() ?? entry.path;
       componentEntries.push({
-        name: primaryName,
-        file: fileName,
+        name: widgetMatches[0][1],
         variants: widgetMatches.length,
         fullPath: entry.path,
       });
@@ -100,7 +102,7 @@ export const flutterExtractor: Extractor = {
 
     const components: DSComponent[] = componentEntries.map((c) => ({
       name: c.name,
-      file: c.file,
+      file: relativeTo(componentsDir, c.fullPath),
       variants: c.variants > 1 ? c.variants : undefined,
     }));
 

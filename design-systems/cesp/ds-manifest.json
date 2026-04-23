@@ -146,19 +146,135 @@
     }
   },
   "components": [
-    { "name": "Button", "variants": 3, "sizes": 3, "file": "Button.tsx" },
-    { "name": "Compact Button", "variants": 2, "sizes": 2, "file": "CompactButton.tsx" },
-    { "name": "Fancy Button", "variants": 1, "sizes": 3, "file": "FancyButton.tsx" },
-    { "name": "Link Button", "variants": 5, "sizes": 2, "file": "LinkButton.tsx" },
-    { "name": "Social Button", "variants": 2, "sizes": 1, "file": "SocialButton.tsx" },
-    { "name": "Input", "variants": 1, "sizes": 3, "file": "Input.tsx" },
-    { "name": "Checkbox", "variants": 1, "sizes": 1, "file": "Checkbox.tsx" },
-    { "name": "Badge", "variants": 3, "sizes": 2, "file": "Badge.tsx" },
-    { "name": "Status Badge", "variants": 2, "sizes": 1, "file": "StatusBadge.tsx" },
-    { "name": "Card", "variants": 1, "sizes": 1, "file": "Card.tsx" },
-    { "name": "Metric Card", "variants": 1, "sizes": 1, "file": "MetricCard.tsx" },
+    {
+      "name": "Button",
+      "variants": 3,
+      "sizes": 3,
+      "file": "Button.tsx",
+      "examples": [
+        { "name": "Primary filled", "code": "<Button variant=\"primary\" buttonStyle=\"filled\">Save changes</Button>" },
+        { "name": "Neutral stroke", "code": "<Button variant=\"neutral\" buttonStyle=\"stroke\">Cancel</Button>" },
+        { "name": "Error filled", "code": "<Button variant=\"error\" buttonStyle=\"filled\">Delete</Button>" }
+      ]
+    },
+    {
+      "name": "Compact Button",
+      "variants": 2,
+      "sizes": 2,
+      "file": "CompactButton.tsx",
+      "examples": [
+        { "name": "Stroke", "code": "<CompactButton buttonStyle=\"stroke\">Compact</CompactButton>" },
+        { "name": "Filled", "code": "<CompactButton buttonStyle=\"filled\">Compact</CompactButton>" }
+      ]
+    },
+    {
+      "name": "Fancy Button",
+      "variants": 1,
+      "sizes": 3,
+      "file": "FancyButton.tsx",
+      "examples": [
+        { "name": "Default", "code": "<FancyButton size=\"md\">Get started</FancyButton>" }
+      ]
+    },
+    {
+      "name": "Link Button",
+      "variants": 5,
+      "sizes": 2,
+      "file": "LinkButton.tsx",
+      "examples": [
+        { "name": "Primary", "code": "<LinkButton buttonStyle=\"primary\">Read more</LinkButton>" },
+        { "name": "Black", "code": "<LinkButton buttonStyle=\"black\">View details</LinkButton>" },
+        { "name": "Error", "code": "<LinkButton buttonStyle=\"error\">Remove</LinkButton>" }
+      ]
+    },
+    {
+      "name": "Social Button",
+      "variants": 2,
+      "sizes": 1,
+      "file": "SocialButton.tsx",
+      "examples": [
+        { "name": "Apple", "code": "<SocialButton brand=\"apple\" buttonStyle=\"filled\">Continue with Apple</SocialButton>" },
+        { "name": "Google", "code": "<SocialButton brand=\"google\" buttonStyle=\"stroke\">Continue with Google</SocialButton>" }
+      ]
+    },
+    {
+      "name": "Input",
+      "variants": 1,
+      "sizes": 3,
+      "file": "Input.tsx",
+      "examples": [
+        { "name": "Basic", "code": "<Input label=\"Email\" placeholder=\"hello@hubera.dev\" />" },
+        { "name": "With hint", "code": "<Input label=\"Username\" placeholder=\"hulusi\" hint=\"3-20 lowercase letters or numbers.\" />" },
+        { "name": "Error state", "code": "<Input label=\"Password\" type=\"password\" defaultValue=\"123\" error=\"Must be at least 8 characters.\" />" }
+      ]
+    },
+    {
+      "name": "Checkbox",
+      "variants": 1,
+      "sizes": 1,
+      "file": "Checkbox.tsx",
+      "examples": [
+        { "name": "Unchecked", "code": "<Checkbox />" },
+        { "name": "Checked", "code": "<Checkbox defaultChecked />" }
+      ]
+    },
+    {
+      "name": "Badge",
+      "variants": 3,
+      "sizes": 2,
+      "file": "Badge.tsx",
+      "examples": [
+        { "name": "Blue light", "code": "<Badge color=\"blue\" badgeStyle=\"light\">New</Badge>" },
+        { "name": "Green filled", "code": "<Badge color=\"green\" badgeStyle=\"filled\">Live</Badge>" },
+        { "name": "Red stroke", "code": "<Badge color=\"red\" badgeStyle=\"stroke\">Beta</Badge>" }
+      ]
+    },
+    {
+      "name": "Status Badge",
+      "variants": 2,
+      "sizes": 1,
+      "file": "StatusBadge.tsx",
+      "examples": [
+        { "name": "Completed", "code": "<StatusBadge status=\"completed\">Completed</StatusBadge>" },
+        { "name": "Pending", "code": "<StatusBadge status=\"pending\">Pending</StatusBadge>" },
+        { "name": "Failed", "code": "<StatusBadge status=\"failed\">Failed</StatusBadge>" }
+      ]
+    },
+    {
+      "name": "Card",
+      "variants": 1,
+      "sizes": 1,
+      "file": "Card.tsx",
+      "examples": [
+        {
+          "name": "Basic card",
+          "code": "<Card className=\"p-6\"><h3 className=\"text-lg font-semibold mb-2\">Card title</h3><p className=\"text-sm text-[var(--text-sub-500)]\">A short description goes inside the card body.</p></Card>"
+        }
+      ]
+    },
+    {
+      "name": "Metric Card",
+      "variants": 1,
+      "sizes": 1,
+      "file": "MetricCard.tsx",
+      "examples": [
+        { "name": "Counter", "code": "<MetricCard label=\"Active users\" value=\"12,394\" />" },
+        { "name": "Revenue", "code": "<MetricCard label=\"MRR\" value=\"$48,210\" dotColor=\"var(--green-base)\" />" }
+      ]
+    },
+    {
+      "name": "Step Indicator",
+      "variants": 1,
+      "sizes": 1,
+      "file": "StepIndicator.tsx",
+      "examples": [
+        {
+          "name": "3-step progress",
+          "code": "<StepIndicator steps={[\"Account\", \"Profile\", \"Confirm\"]} currentStep={1} />"
+        }
+      ]
+    },
     { "name": "Table", "variants": 1, "sizes": 1, "file": "Table.tsx" },
-    { "name": "Step Indicator", "variants": 1, "sizes": 1, "file": "StepIndicator.tsx" },
     { "name": "Dropdown Menu", "variants": 1, "sizes": 1, "file": "DropdownMenu.tsx" }
   ],
   "screenshots": {
